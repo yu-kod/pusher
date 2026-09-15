@@ -22,7 +22,8 @@ frontend/   — React SPA
 backend/    — Hono API + WebSocket ハンドラ（Lambda デプロイ）
   src/game/ — ゲームエンジン（純粋関数。I/O を持たない）
 infra/      — Terraform
-docs/       — 仕様書
+  bootstrap/ — tfstate バケットと GitHub Actions 用 OIDC ロール（初回のみ手動 apply）
+docs/       — 仕様書・デプロイ手順
 ```
 
 ## 開発
@@ -75,6 +76,19 @@ npm 10 の依存解決に既知の不具合があり、`vitest` の peer 依存�
 ロックファイルを作り直す必要がある場合は `npm install --legacy-peer-deps` を使う。
 その際 peer 依存が自動で入らないため、不足したパッケージは明示的に
 `devDependencies` へ追加すること。
+
+## デプロイ
+
+`main` への push で `.github/workflows/deploy.yml` が Terraform apply → S3 sync →
+CloudFront invalidation → 疎通確認を実行する。
+
+認証は GitHub Actions の **OIDC** で行うため、長期の AWS アクセスキーは存在しない。
+GitHub の Secrets に登録するのはロールの ARN（`AWS_ROLE_ARN`）だけ。
+
+初回のみブートストラップ（tfstate バケット・ロックテーブル・OIDC ロールの作成）が必要だが、
+**AWS CloudShell だけで完結するため PC は要らない**。手順は [docs/deploy.md](docs/deploy.md) を参照。
+
+カスタムドメインは任意。未設定なら CloudFront の既定ドメインで公開する。
 
 ## CI
 
