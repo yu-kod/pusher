@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { createRng } from "./rng.js";
-import { DEFAULT_GAME_CONFIG, setupGame } from "./setup.js";
+import { DEFAULT_BALANCE } from "./balance.js";
+import { setupGame } from "./setup.js";
 import { faceDown } from "../test-utils/cards.js";
 import { calculateTarget, classifyRoll, insertCards, type RollOutcome } from "./turn.js";
 
@@ -88,7 +89,7 @@ describe("classifyRoll", () => {
 describe("insertCards", () => {
   /** 手札を指定のカードに差し替えた初期状態を作る */
   function stateWithHand(coins: readonly (1 | 2 | 3)[], pendingCount = 0) {
-    const base = setupGame(["A", "B", "C"], createRng(1), DEFAULT_GAME_CONFIG);
+    const base = setupGame(["A", "B", "C"], createRng(1), DEFAULT_BALANCE);
     const players = base.players.map((p, i) =>
       i === 0 ? { ...p, hand: coins.map((c) => ({ kind: "coin" as const, coins: c })) } : p
     );
@@ -211,7 +212,7 @@ describe("insertCards", () => {
     });
 
     it("イベントカードは投入できない（docs/spec.md ルール解釈メモ）", () => {
-      const base = setupGame(["A", "B", "C"], createRng(1), DEFAULT_GAME_CONFIG);
+      const base = setupGame(["A", "B", "C"], createRng(1), DEFAULT_BALANCE);
       const state = {
         ...base,
         players: base.players.map((p, i) =>

@@ -1,10 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { createDeck } from "./deck.js";
 import { createRng } from "./rng.js";
-import { DEFAULT_GAME_CONFIG, setupGame, type GameConfig } from "./setup.js";
+import { DEFAULT_BALANCE, type Balance } from "./balance.js";
+import { setupGame } from "./setup.js";
 
-function buildConfig(overrides?: Partial<GameConfig>): GameConfig {
-  return { ...DEFAULT_GAME_CONFIG, ...overrides };
+function buildConfig(overrides?: Partial<Balance>): Balance {
+  return { ...DEFAULT_BALANCE, ...overrides };
 }
 
 const NAMES_3 = ["Alice", "Bob", "Carol"];
@@ -176,12 +177,12 @@ describe("setupGame", () => {
   });
 });
 
-describe("DEFAULT_GAME_CONFIG", () => {
+describe("DEFAULT_BALANCE", () => {
   it("設計書どおりの既定値になっている（docs/spec.md §1 §2 §3）", () => {
-    expect(DEFAULT_GAME_CONFIG.laneCount).toBe(4);
-    expect(DEFAULT_GAME_CONFIG.initialLaneCards).toBe(5);
-    expect(DEFAULT_GAME_CONFIG.initialHandSize).toBe(5);
-    expect(DEFAULT_GAME_CONFIG.handLimit).toBe(7);
-    expect(DEFAULT_GAME_CONFIG.maxRounds).toBe(12);
+    expect(DEFAULT_BALANCE.laneCount).toBe(4);
+    expect(DEFAULT_BALANCE.initialLaneCards).toBe(5);
+    expect(DEFAULT_BALANCE.initialHandSize).toBe(5);
+    expect(DEFAULT_BALANCE.handLimit).toBeNull();
+    expect(DEFAULT_BALANCE.maxRounds).toBe(12);
   });
 });

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { createRng, type Rng } from "./rng.js";
-import { DEFAULT_GAME_CONFIG, setupGame, type GameState } from "./setup.js";
+import { DEFAULT_BALANCE } from "./balance.js";
+import { setupGame, type GameState } from "./setup.js";
 import { coin } from "../test-utils/cards.js";
 import { applySideHole, canRollJackpot, rollJackpot, settleJackpotAtGameEnd } from "./jackpot.js";
 
@@ -19,7 +20,7 @@ function scriptedRng(rolls: readonly number[]): Rng {
 }
 
 function buildState(overrides?: Partial<GameState>): GameState {
-  const base = setupGame(["A", "B", "C"], createRng(1), DEFAULT_GAME_CONFIG);
+  const base = setupGame(["A", "B", "C"], createRng(1), DEFAULT_BALANCE);
   return {
     ...base,
     players: base.players.map((p) => ({ ...p, hand: [] })),

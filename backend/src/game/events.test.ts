@@ -2,7 +2,8 @@ import { describe, expect, it } from "vitest";
 import { coin, faceDown, faceUp } from "../test-utils/cards.js";
 import type { Card } from "./deck.js";
 import { createRng, type Rng } from "./rng.js";
-import { DEFAULT_GAME_CONFIG, setupGame, type GameState, type Lane } from "./setup.js";
+import { DEFAULT_BALANCE } from "./balance.js";
+import { setupGame, type GameState, type Lane } from "./setup.js";
 import { resolveAvalanche, resolveExtraSlot, resolveLottery, resolveOpenLane } from "./events.js";
 
 function scriptedRng(rolls: readonly number[]): Rng {
@@ -19,7 +20,7 @@ function scriptedRng(rolls: readonly number[]): Rng {
 }
 
 function buildState(lanes: Partial<Lane>[], overrides?: Partial<GameState>): GameState {
-  const base = setupGame(["A", "B", "C"], createRng(1), DEFAULT_GAME_CONFIG);
+  const base = setupGame(["A", "B", "C"], createRng(1), DEFAULT_BALANCE);
   return {
     ...base,
     players: base.players.map((p) => ({ ...p, hand: [] })),
