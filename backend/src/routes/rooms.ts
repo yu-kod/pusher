@@ -26,7 +26,15 @@ import { createRng, type Rng } from "../game/rng.js";
 import { resolveInsertionRound, type InsertionRoundResult } from "../game/round.js";
 import type { GameState } from "../game/setup.js";
 import { viewFor, type GameView } from "../game/view.js";
-import { createRoom, generateRoomCode, joinRoom, startGame, type Room } from "../room/room.js";
+import { playCpuTurns } from "../room/cpu.js";
+import {
+  createRoom,
+  generateRoomCode,
+  joinRoom,
+  removeCpu,
+  startGame,
+  type Room,
+} from "../room/room.js";
 import type { RoomStore } from "../room/store.js";
 import {
   forbidden,
@@ -186,15 +194,28 @@ export function createRoomsRoute(deps: RoomsDeps) {
     return c.json({ playerId: player?.id, token }, 201);
   });
 
+  // CPU の削除（ロビーのみ）
+  app.delete("/:code/players/:id", async (c) => {
+    const room = await load(c.req.param("code"));
+    const player = authenticate(room, c.req.header("Authorization"));
+
+    const removed = asUnprocessable(() => removeCpu(room, c.req.param("id"), now()));
+    await deps.store.save(removed);
+
+    return c.json(roomBody(removed, player.id));
+  });
+
   // 開始
   app.post("/:code/start", async (c) => {
     const room = await load(c.req.param("code"));
     const player = authenticate(room, c.req.header("Authorization"));
 
     const started = asUnprocessable(() => startGame(room, rngFor(), config, now()));
-    await deps.store.save(started);
+    // 先頭が CPU なら、人間の手番になるまで自動で進める（#16）
+    const advanced = playCpuTurns(started, rngFor(), now());
+    await deps.store.save(advanced);
 
-    return c.json(roomBody(started, player.id));
+    return c.json(roomBody(advanced, player.id));
   });
 
   /** 手番プレイヤー本人であることを確かめ、ゲームの状態を返す */
@@ -240,7 +261,7 @@ export function createRoomsRoute(deps: RoomsDeps) {
     );
 
     const next = result.canContinue ? result.state : finishTurn(result.state, rng);
-    const saved: Room = { ...room, game: next, updatedAt: now() };
+    const saved = playCpuTurns({ ...room, game: next, updatedAt: now() }, rngFor(), now());
     await deps.store.save(saved);
 
     return c.json({ ...roomBody(saved, player.id), result: insertResultBody(result) });
@@ -257,7 +278,8 @@ export function createRoomsRoute(deps: RoomsDeps) {
       throw unprocessable("この手番はまだ1回も投入していない（パスはできない）");
     }
 
-    const saved: Room = { ...room, game: finishTurn(game, rngFor()), updatedAt: now() };
+    const ended: Room = { ...room, game: finishTurn(game, rngFor()), updatedAt: now() };
+    const saved = playCpuTurns(ended, rngFor(), now());
     await deps.store.save(saved);
 
     return c.json(roomBody(saved, player.id));

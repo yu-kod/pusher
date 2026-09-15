@@ -116,3 +116,21 @@ export function startGame(room: Room, rng: Rng, config: Balance, now: number): R
     updatedAt: now,
   };
 }
+
+/** ロビーから CPU プレイヤーを取り除く（#16） */
+export function removeCpu(room: Room, playerId: PlayerId, now: number): Room {
+  if (room.phase !== "lobby") {
+    throw new Error("ゲームが開始しているルームからは削除できない");
+  }
+
+  const target = room.players.find((p) => p.id === playerId);
+  if (target === undefined) {
+    throw new Error(`そのプレイヤーはいない: ${playerId}`);
+  }
+  if (!target.isCpu) {
+    throw new Error("人間のプレイヤーは削除できない");
+  }
+
+  // 残ったプレイヤーの id は振り直さない。招待済みの人のトークンと id の対応が壊れるため
+  return { ...room, players: room.players.filter((p) => p.id !== playerId), updatedAt: now };
+}
