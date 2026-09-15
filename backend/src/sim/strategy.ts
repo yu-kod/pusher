@@ -11,8 +11,8 @@
  * **枚数しか使わない**。中身が見えるのは「横穴開放」で公開されたあとだけで、
  * そこは choosePending が受け取る。
  */
-import { isCoinCard, type CoinCard, type EventKind } from "../game/deck.js";
-import { cardPoints } from "../game/score.js";
+import { autoEventChooser } from "../game/chooser.js";
+import { isCoinCard, type CoinCard } from "../game/deck.js";
 import type { EventChooser } from "../game/resolve.js";
 import type { Rng } from "../game/rng.js";
 import type { GameState, Lane } from "../game/setup.js";
@@ -92,28 +92,6 @@ function pickDistinct(rng: Rng, max: number, count: number): number[] {
   return rng.shuffle(pool).slice(0, count);
 }
 
-/** レーンの選択と滞留の選択。どちらの戦略も同じ判断でよい */
-const eventChoices: EventChooser = {
-  // 滞留が最も厚いレーンを選ぶ。開放すれば大きく、増設すれば以後2枚入れられる
-  chooseLane(state: GameState, _event: EventKind): number {
-    return state.lanes.reduce(
-      (best, lane, index) =>
-        lane.pending.length > best.thickness ? { index, thickness: lane.pending.length } : best,
-      { index: 0, thickness: -1 }
-    ).index;
-  },
-
-  // 公開された滞留から最も高いカードを選ぶ（§6 で表向きになっている）
-  choosePending(state: GameState, laneIndex: number): number {
-    const pending = state.lanes.flatMap((lane, index) => (index === laneIndex ? lane.pending : []));
-    return pending.reduce(
-      (best, p, index) =>
-        cardPoints(p.card) > best.value ? { index, value: cardPoints(p.card) } : best,
-      { index: 0, value: -1 }
-    ).index;
-  },
-};
-
 /**
  * ランダム戦略。
  *
@@ -122,7 +100,7 @@ const eventChoices: EventChooser = {
  */
 export function randomStrategy(): Strategy {
   return {
-    ...eventChoices,
+    ...autoEventChooser,
     name: "random",
 
     chooseInsertions(state, rng) {
@@ -194,7 +172,7 @@ export function expectedValueStrategy(): Strategy {
   };
 
   return {
-    ...eventChoices,
+    ...autoEventChooser,
     name: "expectedValue",
     chooseInsertions: (state) => choose(state),
     // 投入する手が残っているかどうかが、そのまま続けるかどうかになる
