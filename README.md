@@ -76,6 +76,17 @@ npm 10 の依存解決に既知の不具合があり、`vitest` の peer 依存�
 その際 peer 依存が自動で入らないため、不足したパッケージは明示的に
 `devDependencies` へ追加すること。
 
+## CI
+
+`main` への PR で `.github/workflows/ci.yml` が走る。変更のあったディレクトリだけを対象に、
+frontend / backend では lint・format:check・typecheck・test（カバレッジ 100%）を、
+frontend ではさらに build を、infra では `terraform fmt -check` と `terraform validate` を実行する。
+
+必須ステータスチェックには集約ジョブ **`ci`** を1つだけ指定する。
+`frontend` / `backend` / `infra` は変更検出で skip されることがあり、skipped は success に
+ならないため、個別に必須チェックへ指定すると該当ディレクトリを触っていないPRが
+マージできなくなる。
+
 ## 開発ルール
 
 [CLAUDE.md](CLAUDE.md) を参照。チケット管理・ブランチ戦略・コミット規約・PRマージの流れを定めている。
