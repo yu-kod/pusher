@@ -1,22 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { createRng, type Rng } from "./rng.js";
+import { scriptedRng } from "../test-utils/rng.js";
+import { createRng } from "./rng.js";
 import { DEFAULT_BALANCE } from "./balance.js";
 import { setupGame, type GameState } from "./setup.js";
 import { applySideHole, canRollJackpot, rollJackpot, settleJackpotAtGameEnd } from "./jackpot.js";
-
-/** 出目を並べて返す決定的な Rng */
-function scriptedRng(rolls: readonly number[]): Rng {
-  let index = 0;
-  return {
-    nextInt: () => 0,
-    shuffle: (items) => [...items],
-    rollD6: () => {
-      const roll = rolls[index++];
-      if (roll === undefined) throw new Error("出目を使い切った");
-      return roll;
-    },
-  };
-}
 
 function buildState(overrides?: Partial<GameState>): GameState {
   const base = setupGame(["A", "B", "C"], createRng(1), DEFAULT_BALANCE);
