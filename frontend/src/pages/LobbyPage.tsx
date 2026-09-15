@@ -5,6 +5,7 @@ import { loadCredentials, saveCredentials } from "@/lib/session";
 import { messageOf } from "@/lib/errors";
 import { ErrorMessage } from "@/components/ErrorMessage";
 import { useRoom } from "@/features/room/useRoom";
+import { GameBoard } from "@/features/game/GameBoard";
 import type { Credentials, RoomView } from "@/lib/types";
 
 const MIN_PLAYERS = 3;
@@ -34,6 +35,10 @@ export function LobbyPage() {
         }}
       />
     );
+  }
+
+  if (room.game !== null) {
+    return <GameBoard code={code} game={room.game} credentials={credentials} reload={reload} />;
   }
 
   return (
@@ -135,15 +140,6 @@ function Lobby({ code, room, credentials, error, setError, reload }: LobbyProps)
       }
     })();
   };
-
-  if (room.phase === "playing") {
-    return (
-      <main className="mx-auto max-w-md p-6">
-        <h1 className="text-2xl font-bold">ゲーム中</h1>
-        <p className="mt-2 text-gray-600">対局画面は準備中です。</p>
-      </main>
-    );
-  }
 
   return (
     <main className="mx-auto max-w-md p-6">

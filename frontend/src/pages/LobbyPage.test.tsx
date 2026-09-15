@@ -6,6 +6,7 @@ import { renderWithRouter } from "@/test-utils/render";
 import { App } from "@/App";
 import { LobbyPage } from "./LobbyPage";
 import type { RoomView } from "@/lib/types";
+import { buildGame } from "@/test-utils/game";
 
 const CODE = "ABCDEF";
 
@@ -169,13 +170,13 @@ describe("ロビー画面", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent("コピーできませんでした");
   });
 
-  it("ゲームが始まっていれば対局中と表示する", async () => {
+  it("ゲームが始まっていれば対局画面になる", async () => {
     signIn();
-    mockFetch(() => ({ ...lobby([あき, はると, cpu]), phase: "playing" }));
+    mockFetch(() => ({ ...lobby([あき, はると, cpu]), phase: "playing", game: buildGame() }));
 
     renderWithRouter(<App />, { route: `/rooms/${CODE}` });
 
-    expect(await screen.findByRole("heading", { name: "ゲーム中" })).toBeInTheDocument();
+    expect(await screen.findByText("ラウンド 1 / 13")).toBeInTheDocument();
   });
 
   it("開始に失敗したら理由を表示する", async () => {

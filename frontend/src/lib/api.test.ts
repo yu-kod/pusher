@@ -1,5 +1,14 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { ApiError, createRoom, fetchRoom, joinRoom, removeCpu, startGame } from "./api";
+import {
+  ApiError,
+  createRoom,
+  fetchRoom,
+  insertCard,
+  joinRoom,
+  removeCpu,
+  startGame,
+  stopTurn,
+} from "./api";
 
 function mockFetch(status: number, body: unknown) {
   const fetchMock = vi.fn().mockResolvedValue({
@@ -110,5 +119,43 @@ describe("removeCpu", () => {
 
     expect(fetchMock.mock.calls[0]?.[0]).toBe("/api/rooms/ABCDEF/players/p2");
     expect(fetchMock.mock.calls[0]?.[1]).toMatchObject({ method: "DELETE" });
+  });
+});
+
+describe("insertCard", () => {
+  it("レーンと手札の添字を送る", async () => {
+    const fetchMock = mockFetch(200, {
+      code: "ABCDEF",
+      phase: "playing",
+      players: [],
+      game: null,
+      result: {
+        lanes: [],
+        gainedPoints: 0,
+        busted: false,
+        canContinue: true,
+        events: [],
+        jackpot: null,
+      },
+    });
+
+    await insertCard("ABCDEF", "t1", 1, [2]);
+
+    expect(fetchMock.mock.calls[0]?.[0]).toBe("/api/rooms/ABCDEF/turns/insert");
+    expect(fetchMock.mock.calls[0]?.[1]).toMatchObject({
+      method: "POST",
+      body: JSON.stringify({ laneIndex: 1, handIndexes: [2] }),
+      headers: { Authorization: "Bearer t1" },
+    });
+  });
+});
+
+describe("stopTurn", () => {
+  it("やめるを要求する", async () => {
+    const fetchMock = mockFetch(200, { code: "ABCDEF", phase: "playing", players: [], game: null });
+
+    await stopTurn("ABCDEF", "t1");
+
+    expect(fetchMock.mock.calls[0]?.[0]).toBe("/api/rooms/ABCDEF/turns/stop");
   });
 });

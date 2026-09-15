@@ -67,3 +67,35 @@ export function startGame(code: string, token: string): Promise<RoomView> {
 export function removeCpu(code: string, playerId: string, token: string): Promise<RoomView> {
   return request<RoomView>(`/api/rooms/${code}/players/${playerId}`, { method: "DELETE" }, token);
 }
+
+/** 投入ラウンドの結果（サーバーの InsertResultBody に対応する） */
+export type InsertResult = {
+  lanes: {
+    laneIndex: number;
+    roll: number;
+    outcome: "success" | "failure" | "sideHole";
+    target: number;
+  }[];
+  gainedPoints: number;
+  busted: boolean;
+  canContinue: boolean;
+  events: { event: string; extraTurn: boolean }[];
+  jackpot: { roll: number; won: boolean; wonPoints: number } | null;
+};
+
+export function insertCard(
+  code: string,
+  token: string,
+  laneIndex: number,
+  handIndexes: number[]
+): Promise<RoomView & { result: InsertResult }> {
+  return request<RoomView & { result: InsertResult }>(
+    `/api/rooms/${code}/turns/insert`,
+    { method: "POST", body: JSON.stringify({ laneIndex, handIndexes }) },
+    token
+  );
+}
+
+export function stopTurn(code: string, token: string): Promise<RoomView> {
+  return request<RoomView>(`/api/rooms/${code}/turns/stop`, { method: "POST", body: "{}" }, token);
+}
