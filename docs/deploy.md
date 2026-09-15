@@ -42,31 +42,77 @@ tfstate の置き場所と、GitHub Actions が引き受けるロールを作る
 
 CloudShell はコンソールにログインした権限がそのまま使われるため、アクセスキーの発行も `aws configure` も不要。
 
-コンソール右上のターミナルアイコンから CloudShell を開いて、以下を実行する。
+#### 1-1. アカウントを確認する
+
+**最初に必ず確認する。** 会社用など別のアカウントにログインしたまま apply すると、そこにリソースが作られてしまう。
 
 ```bash
-# Terraform を入れる（CloudShell には入っていない）
-curl -fsSLo tf.zip https://releases.hashicorp.com/terraform/1.9.8/terraform_1.9.8_linux_amd64.zip
-unzip -o tf.zip && mkdir -p ~/bin && mv terraform ~/bin/ && export PATH=$HOME/bin:$PATH
-
-# ブートストラップを実行
-git clone https://github.com/yu-kod/pusher.git
-cd pusher/infra/bootstrap
-terraform init
-terraform apply
+aws sts get-caller-identity
 ```
 
-**同じ AWS アカウントで既に別プロジェクトが GitHub Actions の OIDC を使っている場合**、OIDC プロバイダーはアカウントに1つしか作れないため、既存のものを参照する必要がある。
+意図したアカウントでなければ、コンソールでログインし直してから CloudShell を開く。
+
+> なお、IP 制限などの Deny ポリシーが付いたアカウントでは CloudShell から IAM を操作できない。
+> CloudShell からの API 呼び出しの送信元 IP は AWS 側のアドレスになるため、社内 IP を条件にした
+> ポリシーに一致しない。その場合はこの手順では進められない。
+
+#### 1-2. OIDC プロバイダーの有無を確認する
+
+GitHub Actions 用の OIDC プロバイダーは **AWS アカウントに1つしか作れない**。同じアカウントで他のプロジェクトが既に GitHub Actions から OIDC を使っていれば、既存のものを参照する必要がある。
 
 ```bash
 aws iam list-open-id-connect-providers
 ```
 
-出力に `token.actions.githubusercontent.com` が含まれていたら、`apply` をこう変える。
+出力に `token.actions.githubusercontent.com` が含まれていれば、後の apply に
+`-var create_github_oidc_provider=false` を付ける。
+
+#### 1-3. Terraform を入れて apply する
+
+**CloudShell の `$HOME` は 1GB しかなく、AWS provider のバイナリ（数百MB）が入り切らずに
+`no space left on device` になる。** provider の展開先を `/tmp` に逃がす（`/` には数GBの空きがある）。
 
 ```bash
+# terraform を /tmp に入れる（$HOME を消費しない）
+curl -fsSLo /tmp/tf.zip https://releases.hashicorp.com/terraform/1.9.8/terraform_1.9.8_linux_amd64.zip
+unzip -oq /tmp/tf.zip -d /tmp/tfbin
+export PATH=/tmp/tfbin:$PATH
+
+# provider の展開先も /tmp にする
+export TF_DATA_DIR=/tmp/tfdata
+
+# リポジトリは $HOME に置く。apply が途中で失敗したときに
+# terraform.tfstate を残して再開できるようにするため
+git clone https://github.com/yu-kod/pusher.git ~/pusher
+cd ~/pusher/infra/bootstrap
+
+terraform init
+
+# 1-2 で既存の OIDC プロバイダーが見つかった場合
 terraform apply -var create_github_oidc_provider=false
+
+# 見つからなかった場合
+terraform apply
 ```
+
+`PATH` と `TF_DATA_DIR` は `export` なので、セッションを開き直したら設定し直す。
+`/tmp` の中身も消えるが、ブートストラップは一度きりなので問題ない。
+
+#### 1-4. 途中で失敗した場合
+
+apply が途中で止まっても、作成済みのリソースは `terraform.tfstate` に記録されている。
+原因を直して**同じディレクトリで再実行すれば続きから完了する**。作り直されることはない。
+
+よくある失敗:
+
+```
+Error: creating IAM OIDC Provider: ... EntityAlreadyExists:
+Provider with url https://token.actions.githubusercontent.com already exists.
+```
+
+1-2 の確認を飛ばしたときに起きる。`-var create_github_oidc_provider=false` を付けて再実行する。
+
+#### 1-5. 出力
 
 apply が終わると3つの値が出力される。
 

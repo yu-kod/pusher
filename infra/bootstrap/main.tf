@@ -145,9 +145,14 @@ locals {
   github_oidc_arn = var.create_github_oidc_provider ? one(aws_iam_openid_connect_provider.github[*].arn) : one(data.aws_iam_openid_connect_provider.github[*].arn)
 }
 
+# GitHub Actions が OIDC で引き受けるデプロイ用ロール。
+#
+# description は AWS へ送られる値で、IAM が受け付ける文字は ASCII と Latin-1 に
+# 限られる（[\u0009\u000A\u000D\u0020-\u007E\u00A1-\u00FF]）。日本語を入れると
+# ValidationError になるため、説明はこのコメントに書き、属性は英語にする。
 resource "aws_iam_role" "github_actions" {
   name        = "${var.project_name}-github-actions"
-  description = "GitHub Actions が OIDC で引き受けるデプロイ用ロール"
+  description = "Deploy role assumed by GitHub Actions via OIDC"
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
