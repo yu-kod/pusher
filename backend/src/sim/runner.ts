@@ -24,6 +24,22 @@ export type GameStats = {
   insertedCards: number;
   /** 投入した各レーンの、投入前の滞留枚数（§7「滞留の厚み」） */
   pendingThickness: number[];
+  /**
+   * 1投入ラウンドで使ったレーン数（§7 / #56）。
+   *
+   * 常に上限に張り付いているなら「どれだけ賭けるか」の判断が発生していない。
+   */
+  lanesPerInsertion: number[];
+  /** 続けられるのに自分でやめた手番の数（§7 / #56） */
+  voluntaryStops: number;
+  /**
+   * 自分でやめた時点の未確定得点（§7 の「引き際」）。
+   *
+   * §7 の机上計算では 15〜20点あたりが引き際になるとしている。
+   */
+  stopPoints: number[];
+  /** 横穴か手札切れで続けられなくなった手番の数 */
+  forcedStops: number;
   /** 解決したイベントの数 */
   events: number;
   finalPoints: number[];
@@ -60,8 +76,12 @@ export function simulateGame(
     busts: 0,
     insertedCards: 0,
     events: 0,
+    voluntaryStops: 0,
+    forcedStops: 0,
   };
   const pendingThickness: number[] = [];
+  const lanesPerInsertion: number[] = [];
+  const stopPoints: number[] = [];
 
   while (state.phase === "playing") {
     // 「投入口増設」を引くと同じプレイヤーがもう1手番行う（docs/spec.md §6）
@@ -74,9 +94,12 @@ export function simulateGame(
       for (;;) {
         const insertions = strategy.chooseInsertions(state, rng);
         if (insertions.length === 0) {
+          // 投入できる札が手札にない。手番の最初でしか起こらない
+          stats.forcedStops++;
           break;
         }
 
+        lanesPerInsertion.push(insertions.length);
         pendingThickness.push(
           ...thicknessOf(
             state,
@@ -94,7 +117,14 @@ export function simulateGame(
           stats.busts++;
         }
 
-        if (!round.canContinue || !strategy.shouldContinue(state, rng)) {
+        if (!round.canContinue) {
+          // 横穴か手札切れ。やめる／続けるを選ぶ余地がなかった
+          stats.forcedStops++;
+          break;
+        }
+        if (!strategy.shouldContinue(state, rng)) {
+          stats.voluntaryStops++;
+          stopPoints.push(state.pendingPoints);
           break;
         }
       }
@@ -125,6 +155,8 @@ export function simulateGame(
     ...stats,
     finished: state.phase === "finished",
     pendingThickness,
+    lanesPerInsertion,
+    stopPoints,
     finalPoints: state.players.map((p) => p.points),
     winnerSeats: state.players.flatMap((p, seat) => (winnerIds.has(p.id) ? [seat] : [])),
   };
@@ -142,6 +174,25 @@ export type Summary = {
   pointsPerInsertedCard: number;
   /** §7 最優先「滞留の厚み」。目標 3〜5 枚 */
   avgPendingThickness: number;
+  /**
+   * 1投入ラウンドあたりの平均レーン数（§7 / #56）。
+   *
+   * 上限に張り付いていたら「どれだけ賭けるか」の判断が発生していない。
+   */
+  avgLanesPerInsertion: number;
+  /**
+   * 続けられるのに自分でやめた手番の割合（§7 / #56）。
+   *
+   * 0 に近いほど、やめどきの判断ではなく手札切れとバーストだけで手番が終わっている。
+   */
+  voluntaryStopRate: number;
+  /**
+   * 自分でやめた時点の未確定得点の平均（§7 の「引き際」）。
+   *
+   * 机上計算では 15〜20点。小さすぎるなら1回の投入で取りすぎていて、
+   * 積み上げる前に降りるのが正しくなっている。
+   */
+  avgStopPoints: number;
   avgEventsPerGame: number;
   /** 手番順ごとの勝率。引き分けは全員を勝者として数えるため合計は 1 以上になる */
   seatWinRates: number[];
@@ -169,6 +220,9 @@ export function summarize(stats: readonly GameStats[]): Summary {
     pointsPerInsertedCard:
       totalInserted === 0 ? 0 : sum(stats.map((s) => sum(s.finalPoints))) / totalInserted,
     avgPendingThickness: mean(stats.flatMap((s) => s.pendingThickness)),
+    avgLanesPerInsertion: mean(stats.flatMap((s) => s.lanesPerInsertion)),
+    voluntaryStopRate: totalTurns === 0 ? 0 : sum(stats.map((s) => s.voluntaryStops)) / totalTurns,
+    avgStopPoints: mean(stats.flatMap((s) => s.stopPoints)),
     avgEventsPerGame: mean(stats.map((s) => s.events)),
     // stats が空なら seats も 0 になるので、ここでゼロ除算は起きない
     seatWinRates: Array.from(
