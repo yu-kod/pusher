@@ -40,12 +40,23 @@ export type Balance = {
   // ---- 手番とラウンド ----
 
   /**
-   * 1手番に投入できるレーンの数（#39）。
+   * 1回の投入ラウンドで投入できるレーンの数（§3）。
    *
    * 各レーンへ最大1枚ずつ投入でき、投入したレーンの数だけダイスを振る。
-   * 1 にすると変更前のルール（1手番1枚）になる → プリセット singleLane。
+   * そのままチキンレースのリスク調整ダイヤルになる（k レーンなら
+   * バースト確率 1-(5/6)^k）。1 にすると押し引きの幅がなくなる
+   * → プリセット singleLane。
    */
-  maxLanesPerTurn: number;
+  maxLanesPerRound: number;
+
+  /**
+   * 1手番に行える投入ラウンドの回数。`null` で無制限（既定）。
+   *
+   * 手札の枚数と横穴が自然な上限になるため、既定では別途の上限を設けない。
+   * §7 の検証項目「1手番あたりの投入ラウンド数が2〜4回に収まるか」がシミュレーション
+   * （#13）で外れた場合の調整用 → プリセット insertionRounds3。
+   */
+  maxInsertionRoundsPerTurn: number | null;
 
   /**
    * ラウンド終了時に各プレイヤーがドローする枚数（§3）。
@@ -116,7 +127,8 @@ export const DEFAULT_BALANCE: Balance = {
   initialHandSize: 5,
   deck: DEFAULT_DECK_CONFIG,
 
-  maxLanesPerTurn: LANE_COUNT,
+  maxLanesPerRound: LANE_COUNT,
+  maxInsertionRoundsPerTurn: null,
   roundDrawCount: 2,
   roundLaneRefillCount: 0,
   handLimit: null,
@@ -136,10 +148,9 @@ export const DEFAULT_BALANCE: Balance = {
  */
 export const BALANCE_PRESETS = {
   /** §7 次点: レーンを3本に減らす */
-  lanes3: { laneCount: 3, maxLanesPerTurn: 3 },
+  lanes3: { laneCount: 3, maxLanesPerRound: 3 },
   /** §7 次点: レーン4本（既定と同じ。比較対象として明示する） */
-  lanes4: { laneCount: 4, maxLanesPerTurn: 4 },
-  /** §7: レーンを4本に戻す（v0.1 の構成） */
+  lanes4: { laneCount: 4, maxLanesPerRound: 4 },
 
   /**
    * §7 次点: 3コイン札の比率をコイン札の 15% まで下げる。
@@ -168,8 +179,11 @@ export const BALANCE_PRESETS = {
   /** §7 次点: 手札上限を 7 枚に設ける（§3 の原案） */
   handLimit7: { handLimit: 7 },
 
-  /** #39 の変更前のルール: 1手番に1レーンだけ */
-  singleLane: { maxLanesPerTurn: 1 },
+  /** #39 の変更前のルール: 1回の投入ラウンドで1レーンだけ */
+  singleLane: { maxLanesPerRound: 1 },
+
+  /** §7: 1手番あたりの投入ラウンドを3回までに制限する */
+  insertionRounds3: { maxInsertionRoundsPerTurn: 3 },
 } as const satisfies Record<string, Partial<Balance>>;
 
 export type PresetName = keyof typeof BALANCE_PRESETS;

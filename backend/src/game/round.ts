@@ -53,7 +53,34 @@ export type InsertionRoundResult = {
   busted: boolean;
   /** 横穴でカウンターが閾値に達し、JP判定を行った場合のみ入る */
   jackpot: RoundJackpotResult | null;
+  /**
+   * もう一度投入ラウンドを行えるか（docs/spec.md §3）。
+   *
+   * 実際に続けるかはプレイヤーが決める。false なら選ぶ余地がなく、未確定得点を
+   * 確定して手番終了になる（横穴の場合はすでにジャックポットへ移っている）。
+   */
+  canContinue: boolean;
 };
+
+/**
+ * もう一度投入ラウンドを行える状態か（docs/spec.md §3）。
+ *
+ * 横穴が出た場合は手番が即座に終了するため、呼ばれない。
+ *
+ * - 手札が空なら投入できない
+ * - config.maxInsertionRoundsPerTurn を超えない（既定は無制限）
+ */
+function canContinueTurn(state: GameState): boolean {
+  const hasCards = state.players.some(
+    (player, index) => index === state.currentPlayerIndex && player.hand.length > 0
+  );
+  if (!hasCards) {
+    return false;
+  }
+
+  const max = state.config.maxInsertionRoundsPerTurn;
+  return max === null || state.insertionRoundsThisTurn < max;
+}
 
 /**
  * 投入ラウンドを1回解決する（docs/spec.md §3）。
@@ -92,11 +119,22 @@ export function resolveInsertionRound(
   });
 
   const gainedPoints = current.pendingPoints - state.pendingPoints;
+  current = { ...current, insertionRoundsThisTurn: current.insertionRoundsThisTurn + 1 };
 
   const busted = lanes.some((lane) => lane.outcome === "sideHole");
   if (!busted) {
-    return { state: current, lanes, gainedPoints, busted, jackpot: null };
+    return {
+      state: current,
+      lanes,
+      gainedPoints,
+      busted,
+      jackpot: null,
+      canContinue: canContinueTurn(current),
+    };
   }
+
+  // 横穴で手番が終わるので、投入ラウンドの回数を 0 に戻す（「やめる」と同じ扱い）
+  current = { ...current, insertionRoundsThisTurn: 0 };
 
   // §5 横穴 — 未確定得点がすべてジャックポットへ移り、カウンターが1つ進む。
   // 複数レーンが横穴でも1回だけ適用する（docs/spec.md のルール解釈メモ）
@@ -104,7 +142,7 @@ export function resolveInsertionRound(
 
   // §5 ジャックポットチャンス — カウンターが閾値に達していれば即座に JP判定
   if (!canRollJackpot(current)) {
-    return { state: current, lanes, gainedPoints, busted, jackpot: null };
+    return { state: current, lanes, gainedPoints, busted, jackpot: null, canContinue: false };
   }
 
   const { state: afterJackpot, roll, won, wonPoints } = rollJackpot(current, rng);
@@ -114,5 +152,6 @@ export function resolveInsertionRound(
     gainedPoints,
     busted,
     jackpot: { roll, won, wonPoints },
+    canContinue: false,
   };
 }

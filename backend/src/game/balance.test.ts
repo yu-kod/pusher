@@ -160,11 +160,11 @@ describe("BALANCE_PRESETS（docs/spec.md §7 の検証項目）", () => {
 
   describe("投入できるレーン数（#39）", () => {
     it("既定は全レーンへ1枚ずつ投入できる", () => {
-      expect(DEFAULT_BALANCE.maxLanesPerTurn).toBe(DEFAULT_BALANCE.laneCount);
+      expect(DEFAULT_BALANCE.maxLanesPerRound).toBe(DEFAULT_BALANCE.laneCount);
     });
 
     it("singleLane は1手番に1レーンだけに制限する（変更前のルール）", () => {
-      expect(withPreset("singleLane").maxLanesPerTurn).toBe(1);
+      expect(withPreset("singleLane").maxLanesPerRound).toBe(1);
     });
   });
 });

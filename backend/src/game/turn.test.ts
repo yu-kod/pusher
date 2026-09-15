@@ -279,7 +279,7 @@ describe("insertIntoLanes", () => {
       ).toThrow(Error);
     });
 
-    it("config.maxLanesPerTurn を超えるレーン数なら例外を投げる", () => {
+    it("config.maxLanesPerRound を超えるレーン数なら例外を投げる", () => {
       const state = { ...stateWithHand([3, 2, 1]), config: withPreset("singleLane") };
 
       expect(() =>

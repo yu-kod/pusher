@@ -360,4 +360,133 @@ describe("resolveInsertionRound（投入ラウンド）", () => {
     expect(state.pendingPoints).toBe(0);
     expect(state.lanes[0]?.pending).toHaveLength(1);
   });
+
+  describe("続けられるか（docs/spec.md §3 チキンレース）", () => {
+    it("手札が残っていて横穴も出ていなければ続けられる", () => {
+      const state = buildState([1, 1], [{ stock: [coin(2)] }]);
+
+      const result = resolveInsertionRound(
+        state,
+        [{ laneIndex: 0, handIndexes: [0] }],
+        scriptedRng([1])
+      );
+
+      expect(result.canContinue).toBe(true);
+    });
+
+    it("横穴が出たら続けられない（手番は即座に終了する）", () => {
+      const state = buildState(
+        [1, 1],
+        [{ stock: [coin(1)], pending: faceDown([coin(1), coin(1), coin(1), coin(1), coin(1)]) }]
+      );
+
+      const result = resolveInsertionRound(
+        state,
+        [{ laneIndex: 0, handIndexes: [0] }],
+        scriptedRng([6])
+      );
+
+      expect(result.busted).toBe(true);
+      expect(result.canContinue).toBe(false);
+    });
+
+    it("手札が空になったら続けられない（docs/spec.md §3）", () => {
+      const state = buildState([1], [{ stock: [coin(2)] }]);
+
+      const result = resolveInsertionRound(
+        state,
+        [{ laneIndex: 0, handIndexes: [0] }],
+        scriptedRng([1])
+      );
+
+      expect(result.state.players[0]?.hand).toEqual([]);
+      expect(result.canContinue).toBe(false);
+    });
+
+    it("投入ラウンド数を数える", () => {
+      const state = buildState([1, 1], [{ stock: [coin(2), coin(2)] }]);
+
+      const first = resolveInsertionRound(
+        state,
+        [{ laneIndex: 0, handIndexes: [0] }],
+        scriptedRng([1])
+      );
+      expect(first.state.insertionRoundsThisTurn).toBe(1);
+
+      const second = resolveInsertionRound(
+        first.state,
+        [{ laneIndex: 0, handIndexes: [0] }],
+        scriptedRng([1])
+      );
+      expect(second.state.insertionRoundsThisTurn).toBe(2);
+    });
+
+    it("config.maxInsertionRoundsPerTurn に達したら続けられない", () => {
+      const base = buildState([1, 1, 1], [{ stock: [coin(2), coin(2)] }]);
+      const state = {
+        ...base,
+        config: { ...base.config, maxInsertionRoundsPerTurn: 1 },
+      };
+
+      const result = resolveInsertionRound(
+        state,
+        [{ laneIndex: 0, handIndexes: [0] }],
+        scriptedRng([1])
+      );
+
+      expect(result.state.players[0]?.hand).toHaveLength(2);
+      expect(result.canContinue).toBe(false);
+    });
+
+    it("既定は無制限なので手札と横穴だけが上限になる", () => {
+      expect(DEFAULT_BALANCE.maxInsertionRoundsPerTurn).toBeNull();
+    });
+
+    it("横穴で手番が終わったら投入ラウンド数を戻す", () => {
+      const base = buildState(
+        [1, 1],
+        [{ stock: [coin(1)], pending: faceDown([coin(1), coin(1), coin(1), coin(1), coin(1)]) }],
+        { insertionRoundsThisTurn: 3 }
+      );
+
+      const result = resolveInsertionRound(
+        base,
+        [{ laneIndex: 0, handIndexes: [0] }],
+        scriptedRng([6])
+      );
+
+      expect(result.state.insertionRoundsThisTurn).toBe(0);
+    });
+  });
+
+  describe("バースト確率（docs/spec.md §3 リスクの調整ダイヤル）", () => {
+    /** 目標値6以上のレーン。出目6 が横穴になる */
+    const bustable = (): Partial<Lane> => ({
+      stock: [coin(1), coin(1), coin(1)],
+      pending: faceDown([coin(1), coin(1), coin(1), coin(1), coin(1)]),
+    });
+
+    /** k個のダイスの出目の全組み合わせ（6^k 通り） */
+    function allRolls(k: number): number[][] {
+      return k === 0
+        ? [[]]
+        : allRolls(k - 1).flatMap((rest) => [1, 2, 3, 4, 5, 6].map((face) => [face, ...rest]));
+    }
+
+    it.each([1, 2, 3])("%i レーンに投入したバースト確率は 1-(5/6)^k になる", (laneCount) => {
+      const state = buildState([1, 1, 1], [bustable(), bustable(), bustable()]);
+      const insertions = Array.from({ length: laneCount }, (_, i) => ({
+        laneIndex: i,
+        handIndexes: [i],
+      }));
+
+      const combinations = allRolls(laneCount);
+      const busts = combinations.filter(
+        // JP判定は起きない（カウンターが 0 から始まる）ので、出目は投入ラウンドのぶんだけ
+        (rolls) => resolveInsertionRound(state, insertions, scriptedRng(rolls)).busted
+      ).length;
+
+      expect(busts / combinations.length).toBeCloseTo(1 - (5 / 6) ** laneCount, 10);
+    });
+  });
 });

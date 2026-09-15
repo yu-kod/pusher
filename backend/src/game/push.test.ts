@@ -331,3 +331,11 @@ describe("bankPendingPoints", () => {
     expect(() => bankPendingPoints(state)).toThrow(RangeError);
   });
 });
+
+describe("bankPendingPoints — 手番終了時のリセット", () => {
+  it("「やめる」で投入ラウンド数を戻す（docs/spec.md §3）", () => {
+    const state = { ...buildState({}), pendingPoints: 4, insertionRoundsThisTurn: 3 };
+
+    expect(bankPendingPoints(state).insertionRoundsThisTurn).toBe(0);
+  });
+});

@@ -97,7 +97,7 @@ export type InsertIntoLanesResult = {
  * - 各レーンへ**最大1枚ずつ**（「投入口増設」のあるレーンは2枚まで。§6）
  * - 同じレーンは2回指定できない
  * - 最低1レーンは投入する（パスはできない）
- * - 投入できるレーン数の上限は `config.maxLanesPerTurn`
+ * - 投入できるレーン数の上限は `config.maxLanesPerRound`
  *
  * 手札の添字はすべて**投入前**の手札に対する添字として解釈する。レーンごとに
  * 順次取り除くと添字がずれてしまうため、まとめて解決してから一度に取り除く。
@@ -117,9 +117,9 @@ export function insertIntoLanes(
   if (insertions.length < 1) {
     throw new Error("最低1レーンには投入する必要がある");
   }
-  if (insertions.length > state.config.maxLanesPerTurn) {
+  if (insertions.length > state.config.maxLanesPerRound) {
     throw new Error(
-      `1手番に投入できるのは ${state.config.maxLanesPerTurn} レーンまで: ${insertions.length} レーンを指定した`
+      `1回の投入ラウンドで投入できるのは ${state.config.maxLanesPerRound} レーンまで: ${insertions.length} レーンを指定した`
     );
   }
   if (new Set(insertions.map((i) => i.laneIndex)).size !== insertions.length) {
