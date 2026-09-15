@@ -71,6 +71,13 @@ export type GameState = {
   /** ジャックポットカウンター（0〜5） */
   jackpotCounter: number;
   currentPlayerIndex: number;
+  /**
+   * このラウンドのスタートプレイヤー（§3）。
+   *
+   * ここから時計回りに手番が回り、一周したらラウンド終了。
+   * config.rotateStartPlayer が true なら、ラウンドごとに次のプレイヤーへ移る。
+   */
+  startPlayerIndex: number;
   round: number;
   /** ゲーム終了時の未払い出し処理に使う（§5） */
   lastSideHolePlayerId: PlayerId | null;
@@ -137,6 +144,7 @@ export function setupGame(playerNames: readonly string[], rng: Rng, config: Bala
     jackpotPoints: 0,
     jackpotCounter: 0,
     currentPlayerIndex: 0,
+    startPlayerIndex: 0,
     round: 1,
     lastSideHolePlayerId: null,
     phase: "playing",

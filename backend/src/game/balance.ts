@@ -103,6 +103,16 @@ export type Balance = {
   /** この数のラウンドが終わったらゲーム終了（§3） */
   maxRounds: number;
 
+  /**
+   * ラウンドごとにスタートプレイヤーを次へ回すか（§3）。
+   *
+   * 滞留はラウンドを通じて育つため、後の手番ほど厚いレーンに当たりやすい。
+   * 初期滞留を配って大幅に縮んだあとも、最後手がわずかに有利な傾向が残っていた（#54）。
+   * 全員が順番にスタートプレイヤーを務めることで、この残りを均す。
+   * → プリセット fixedStartPlayer で交代なしと比較できる。
+   */
+  rotateStartPlayer: boolean;
+
   // ---- 押し出し ----
 
   /**
@@ -150,6 +160,7 @@ export const DEFAULT_BALANCE: Balance = {
   roundLaneRefillCount: 0,
   handLimit: null,
   maxRounds: 12,
+  rotateStartPlayer: true,
 
   pushCount: (totalCoins) => Math.ceil(totalCoins / 2),
 
@@ -198,6 +209,9 @@ export const BALANCE_PRESETS = {
   initialPending0: { initialPendingCards: 0 },
   /** #53 #54: 初期滞留を 3 枚にする */
   initialPending3: { initialPendingCards: 3 },
+
+  /** #54 以前の挙動: スタートプレイヤーを固定する */
+  fixedStartPlayer: { rotateStartPlayer: false },
 
   /** §7 次点: 手札上限を 7 枚に設ける（§3 の原案） */
   handLimit7: { handLimit: 7 },

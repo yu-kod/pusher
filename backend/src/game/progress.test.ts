@@ -455,3 +455,54 @@ describe("ラウンド終了時に引いたイベント（docs/spec.md §6）", 
     expect(endRound(state, { ...scriptedRng([]), ...noShuffle }, chooser).events).toEqual([]);
   });
 });
+
+describe("スタートプレイヤーの交代（docs/spec.md §3）", () => {
+  const noShuffle = { shuffle: <T>(items: readonly T[]): T[] => [...items] };
+  const rng = { ...scriptedRng([]), ...noShuffle };
+  const plenty = () => Array.from({ length: 20 }, () => coin(1));
+
+  it("ラウンド終了ごとにスタートプレイヤーが次へ回る", () => {
+    const state = buildState({ drawPile: plenty() });
+
+    const next = endRound(state, rng, chooser).state;
+
+    expect(next.startPlayerIndex).toBe(1);
+    expect(next.currentPlayerIndex).toBe(1);
+  });
+
+  it("最後のプレイヤーまで回ったら先頭へ戻る", () => {
+    const state = buildState({ drawPile: plenty(), startPlayerIndex: 2, currentPlayerIndex: 2 });
+
+    expect(endRound(state, rng, chooser).state.startPlayerIndex).toBe(0);
+  });
+
+  it("スタートプレイヤーが一周したらラウンド終了になる", () => {
+    // このラウンドは B から始まっている。D → B に戻ったらラウンド終了
+    const state = buildState({ startPlayerIndex: 1, currentPlayerIndex: 0 });
+
+    expect(endTurn(state).roundEnded).toBe(true);
+  });
+
+  it("スタートプレイヤーの手前ではラウンド終了にならない", () => {
+    const state = buildState({ startPlayerIndex: 1, currentPlayerIndex: 1 });
+
+    expect(endTurn(state).roundEnded).toBe(false);
+  });
+
+  it("config.rotateStartPlayer を false にすると交代しない", () => {
+    const base = buildState({ drawPile: plenty() });
+    const state = { ...base, config: { ...base.config, rotateStartPlayer: false } };
+
+    const next = endRound(state, rng, chooser).state;
+
+    expect(next.startPlayerIndex).toBe(0);
+    expect(next.currentPlayerIndex).toBe(0);
+  });
+
+  it("セットアップでは先頭のプレイヤーから始まる（docs/spec.md §2）", () => {
+    const state = setupGame(["A", "B", "C"], createRng(1), DEFAULT_BALANCE);
+
+    expect(state.startPlayerIndex).toBe(0);
+    expect(state.currentPlayerIndex).toBe(0);
+  });
+});
