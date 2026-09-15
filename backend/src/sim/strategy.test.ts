@@ -72,6 +72,20 @@ describe("randomStrategy", () => {
     expect(strategy.chooseInsertions(buildState([]), createRng(1))).toEqual([]);
   });
 
+  it("手札にイベントカードが混ざっていても投入対象にしない", () => {
+    // セットアップとドローで引き直すので正常系では起こらないが、防御的に無視する
+    const base = buildState([1]);
+    const state = {
+      ...base,
+      players: base.players.map((p, i) =>
+        i === 0 ? { ...p, hand: [{ kind: "event" as const, event: "avalanche" as const }] } : p
+      ),
+    };
+
+    expect(randomStrategy().chooseInsertions(state, createRng(1))).toEqual([]);
+    expect(expectedValueStrategy().chooseInsertions(state, createRng(1))).toEqual([]);
+  });
+
   it("config.maxLanesPerRound を守る（既定は1レーン）", () => {
     const rng = createRng(5);
     const state = buildState([1, 2, 3]);

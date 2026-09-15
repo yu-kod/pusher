@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createDeck } from "./deck.js";
+import { createDeck, isCoinCard, isEventCard } from "./deck.js";
 import { createRng } from "./rng.js";
 import { DEFAULT_BALANCE, type Balance } from "./balance.js";
 import { setupGame } from "./setup.js";
@@ -212,6 +212,72 @@ describe("setupGame", () => {
 
       expect(() => setupGame(NAMES_4, createRng(1), tiny)).toThrow(RangeError);
     });
+  });
+});
+
+describe("配布でイベントカードを引き直す（docs/spec.md ルール解釈メモ）", () => {
+  /** イベントの比率を上げて、引き直しが必ず起きる状況を作る */
+  const eventHeavy = buildConfig({
+    deck: { coins: { 1: 60, 2: 0, 3: 0 }, events: { ...DEFAULT_BALANCE.deck.events } },
+  });
+
+  it("どのプレイヤーの手札にもイベントカードが入らない", () => {
+    for (let seed = 1; seed <= 30; seed++) {
+      const state = setupGame(NAMES_4, createRng(seed), DEFAULT_BALANCE);
+
+      expect(state.players.flatMap((p) => p.hand).every(isCoinCard)).toBe(true);
+    }
+  });
+
+  it("イベントが多いデッキでも手札はコインカードだけになる", () => {
+    const state = setupGame(NAMES_4, createRng(1), eventHeavy);
+
+    expect(state.players.flatMap((p) => p.hand).every(isCoinCard)).toBe(true);
+  });
+
+  it("引き直したイベントカードは山札に残る（総枚数が変わらない）", () => {
+    const config = buildConfig();
+    const state = setupGame(NAMES_4, createRng(3), config);
+
+    const all = [
+      ...state.drawPile,
+      ...state.lanes.flatMap((l) => [...l.stock, ...l.pending.map((p) => p.card)]),
+      ...state.players.flatMap((p) => p.hand),
+      ...state.discardPile,
+    ];
+
+    expect(all).toHaveLength(createDeck(config.deck).length);
+  });
+
+  it("レーンにはイベントカードが入りうる（引き直すのは手札だけ）", () => {
+    // レーンと滞留は引き直さないので、多数のシードのどこかで必ずイベントが入る
+    const inLanes = Array.from({ length: 30 }, (_, i) =>
+      setupGame(NAMES_4, createRng(i + 1), DEFAULT_BALANCE).lanes.flatMap((l) => [
+        ...l.stock,
+        ...l.pending.map((p) => p.card),
+      ])
+    ).flat();
+
+    expect(inLanes.some(isEventCard)).toBe(true);
+  });
+
+  it("配る枚数は変わらない", () => {
+    const state = setupGame(NAMES_4, createRng(1), eventHeavy);
+
+    expect(state.players.map((p) => p.hand.length)).toEqual([5, 5, 5, 5]);
+  });
+
+  it("コインカードが足りなければ例外を投げる", () => {
+    // 総枚数 55 は配布に足りる（50枚）が、コインは 15枚しかない。
+    // レーンと滞留に 30枚使ったあと、手札 20枚ぶんのコインは必ず尽きる
+    const noCoins = buildConfig({
+      deck: {
+        coins: { 1: 15, 2: 0, 3: 0 },
+        events: { avalanche: 10, openLane: 10, extraSlot: 10, lottery: 10 },
+      },
+    });
+
+    expect(() => setupGame(NAMES_4, createRng(1), noCoins)).toThrow(/コインカードが足りない/);
   });
 });
 
