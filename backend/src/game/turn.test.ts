@@ -139,7 +139,15 @@ describe("insertIntoLanes", () => {
   });
 
   it("手番プレイヤーの手札から投入する", () => {
-    const state = { ...stateWithHand([2, 1]), currentPlayerIndex: 1 };
+    const base = stateWithHand([2, 1]);
+    const state = {
+      ...base,
+      // 手番は B。B の手札もコイン札に固定しておく（配られる札にイベントが混ざるため）
+      players: base.players.map((p, i) =>
+        i === 1 ? { ...p, hand: [coin(1), coin(1), coin(1), coin(1), coin(1)] } : p
+      ),
+      currentPlayerIndex: 1,
+    };
 
     // 手番は B なので、A の手札は減らない
     const result = insertIntoLanes(state, intoLane(0, [0]));

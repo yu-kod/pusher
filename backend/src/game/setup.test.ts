@@ -26,14 +26,6 @@ describe("setupGame", () => {
       }
     });
 
-    it("滞留エリアは空で始まる", () => {
-      const state = setupGame(NAMES_4, createRng(1), buildConfig());
-
-      for (const lane of state.lanes) {
-        expect(lane.pending).toEqual([]);
-      }
-    });
-
     it("増設マーカーは置かれていない", () => {
       const state = setupGame(NAMES_4, createRng(1), buildConfig());
 
@@ -110,12 +102,44 @@ describe("setupGame", () => {
     });
   });
 
+  describe("滞留エリアの初期配置（docs/spec.md §2）", () => {
+    it("各レーンの滞留に initialPendingCards 枚ずつ置く", () => {
+      const state = setupGame(NAMES_4, createRng(1), buildConfig());
+
+      expect(state.lanes.map((l) => l.pending.length)).toEqual([5, 5, 5]);
+    });
+
+    it("裏向きで置く（中身は誰にも見えない・docs/spec.md §8）", () => {
+      const state = setupGame(NAMES_4, createRng(1), buildConfig());
+
+      expect(state.lanes.every((l) => l.pending.every((p) => !p.faceUp))).toBe(true);
+    });
+
+    it("0 枚にすれば滞留が空の状態から始まる", () => {
+      const config = { ...buildConfig(), initialPendingCards: 0 };
+
+      expect(
+        setupGame(NAMES_4, createRng(1), config).lanes.every((l) => l.pending.length === 0)
+      ).toBe(true);
+    });
+
+    it("奥の山と滞留は別のカードになる", () => {
+      const state = setupGame(NAMES_4, createRng(1), buildConfig());
+      const lane = state.lanes[0];
+
+      expect(lane?.stock).toHaveLength(5);
+      expect(lane?.pending).toHaveLength(5);
+    });
+  });
+
   describe("山札", () => {
     it("配った残りが山札になる", () => {
       const config = buildConfig();
       const state = setupGame(NAMES_4, createRng(1), config);
 
-      const dealt = config.laneCount * config.initialLaneCards + 4 * config.initialHandSize;
+      const dealt =
+        config.laneCount * (config.initialLaneCards + config.initialPendingCards) +
+        4 * config.initialHandSize;
       expect(state.drawPile).toHaveLength(createDeck(config.deck).length - dealt);
     });
 
@@ -195,6 +219,7 @@ describe("DEFAULT_BALANCE", () => {
   it("設計書どおりの既定値になっている（docs/spec.md §1 §2 §3）", () => {
     expect(DEFAULT_BALANCE.laneCount).toBe(3);
     expect(DEFAULT_BALANCE.initialLaneCards).toBe(5);
+    expect(DEFAULT_BALANCE.initialPendingCards).toBe(5);
     expect(DEFAULT_BALANCE.initialHandSize).toBe(5);
     expect(DEFAULT_BALANCE.handLimit).toBeNull();
     expect(DEFAULT_BALANCE.maxRounds).toBe(12);

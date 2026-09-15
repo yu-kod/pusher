@@ -85,7 +85,7 @@ const MAX_PLAYERS = 4;
  * 初期状態を作る（docs/spec.md §2）。
  *
  * 1. メインデッキをシャッフルする
- * 2. 各レーンの奥に initialLaneCards 枚ずつ裏向きで配置する
+ * 2. 各レーンの奥に initialLaneCards 枚、滞留エリアに initialPendingCards 枚ずつ裏向きで配置する
  * 3. 各プレイヤーに initialHandSize 枚を配る
  * 4. ジャックポットカウンターを 0 に置く
  * 5. 残りを山札とする
@@ -100,7 +100,8 @@ export function setupGame(playerNames: readonly string[], rng: Rng, config: Bala
   const deck = rng.shuffle(createDeck(config.deck));
 
   const required =
-    config.laneCount * config.initialLaneCards + playerNames.length * config.initialHandSize;
+    config.laneCount * (config.initialLaneCards + config.initialPendingCards) +
+    playerNames.length * config.initialHandSize;
   if (deck.length < required) {
     throw new RangeError(
       `デッキが足りない: 配布に ${required} 枚必要だが ${deck.length} 枚しかない`
@@ -113,7 +114,8 @@ export function setupGame(playerNames: readonly string[], rng: Rng, config: Bala
 
   const lanes: Lane[] = Array.from({ length: config.laneCount }, () => ({
     stock: take(config.initialLaneCards),
-    pending: [],
+    // 滞留も裏向きで始める。空から始めると先手が一方的に不利になる（§2 / #54）
+    pending: take(config.initialPendingCards).map((card) => ({ card, faceUp: false })),
     hasExtraSlot: false,
   }));
 

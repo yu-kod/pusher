@@ -20,13 +20,13 @@ describe("DEFAULT_BALANCE", () => {
     expect(DEFAULT_BALANCE.handLimit).toBeNull();
   });
 
-  it("コイン札の構成比が 40 / 35 / 25 に近い（docs/spec.md §1）", () => {
+  it("コイン札の構成比が 46 / 39 / 15 に近い（docs/spec.md §1）", () => {
     const coins = createDeck(DEFAULT_BALANCE.deck).filter(isCoinCard);
 
     const ratio = (n: 1 | 2 | 3) => coins.filter((c) => c.coins === n).length / coins.length;
-    expect(ratio(1)).toBeCloseTo(0.4, 1);
-    expect(ratio(2)).toBeCloseTo(0.35, 1);
-    expect(ratio(3)).toBeCloseTo(0.25, 1);
+    expect(ratio(1)).toBeCloseTo(0.46, 1);
+    expect(ratio(2)).toBeCloseTo(0.39, 1);
+    expect(ratio(3)).toBeCloseTo(0.15, 1);
   });
 
   it("イベントカードがデッキ全体の 15% を占める（docs/spec.md §1）", () => {
@@ -79,9 +79,9 @@ describe("BALANCE_PRESETS（docs/spec.md §7 の検証項目）", () => {
       expect.arrayContaining([
         "lanes3",
         "lanes4",
-        "coin3Ratio15",
+        "coin3Ratio25",
         "noRoundDraw",
-        "pushHalf",
+        "pushFull",
         "pushPlusOne",
         "jackpotHalfCarryOver",
       ])
@@ -105,15 +105,15 @@ describe("BALANCE_PRESETS（docs/spec.md §7 の検証項目）", () => {
   });
 
   describe("3コイン札の比率（§7 次点）", () => {
-    it("coin3Ratio15 は3コイン札をコイン札の 15% 程度に下げる", () => {
-      const coins = createDeck(withPreset("coin3Ratio15").deck).filter(isCoinCard);
+    it("既定は3コイン札をコイン札の 15% 程度に抑えている", () => {
+      const coins = createDeck(DEFAULT_BALANCE.deck).filter(isCoinCard);
 
       const ratio = coins.filter((c) => c.coins === 3).length / coins.length;
       expect(ratio).toBeCloseTo(0.15, 1);
     });
 
     it("総枚数は既定と変わらない", () => {
-      expect(createDeck(withPreset("coin3Ratio15").deck)).toHaveLength(
+      expect(createDeck(withPreset("coin3Ratio25").deck)).toHaveLength(
         createDeck(DEFAULT_BALANCE.deck).length
       );
     });
@@ -126,18 +126,18 @@ describe("BALANCE_PRESETS（docs/spec.md §7 の検証項目）", () => {
   });
 
   describe("押し込み枚数（§7 最優先）", () => {
-    it("既定はコイン数そのまま", () => {
+    it("既定はコイン数 ÷ 2（切り上げ）", () => {
       expect(DEFAULT_BALANCE.pushCount(1)).toBe(1);
-      expect(DEFAULT_BALANCE.pushCount(2)).toBe(2);
-      expect(DEFAULT_BALANCE.pushCount(3)).toBe(3);
+      expect(DEFAULT_BALANCE.pushCount(2)).toBe(1);
+      expect(DEFAULT_BALANCE.pushCount(3)).toBe(2);
     });
 
-    it("pushHalf はコイン数 ÷ 2（切り上げ）に圧縮する", () => {
-      const { pushCount } = withPreset("pushHalf");
+    it("pushFull はコイン数そのままに戻す（#53 以前の既定）", () => {
+      const { pushCount } = withPreset("pushFull");
 
       expect(pushCount(1)).toBe(1);
-      expect(pushCount(2)).toBe(1);
-      expect(pushCount(3)).toBe(2);
+      expect(pushCount(2)).toBe(2);
+      expect(pushCount(3)).toBe(3);
     });
 
     it("pushPlusOne はコイン数 + 1 に増やす", () => {
@@ -197,7 +197,7 @@ describe("プリセットがエンジンの挙動を変える", () => {
     expect(setupGame(["A", "B", "C"], createRng(1), withPreset("lanes4")).lanes).toHaveLength(4);
   });
 
-  it("pushHalf を適用すると押し込み枚数が減る", async () => {
+  it("pushFull を適用すると押し込み枚数が増える", async () => {
     const { setupGame } = await import("./setup.js");
     const { createRng } = await import("./rng.js");
     const { resolvePush } = await import("./push.js");
@@ -219,9 +219,9 @@ describe("プリセットがエンジンの挙動を変える", () => {
       };
     };
 
-    // 3コイン札の投入: 既定は3枚、pushHalf は ceil(3/2) = 2枚
-    expect(resolvePush(build(DEFAULT_BALANCE), 0, 3).pushedCount).toBe(3);
-    expect(resolvePush(build(withPreset("pushHalf")), 0, 3).pushedCount).toBe(2);
+    // 3コイン札の投入: 既定は ceil(3/2) = 2枚、pushFull は3枚
+    expect(resolvePush(build(DEFAULT_BALANCE), 0, 3).pushedCount).toBe(2);
+    expect(resolvePush(build(withPreset("pushFull")), 0, 3).pushedCount).toBe(3);
   });
 
   it("jackpotHalfCarryOver を適用すると半分だけ獲得し残りが持ち越される", async () => {
