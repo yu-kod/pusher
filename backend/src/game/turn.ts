@@ -131,7 +131,9 @@ export function insertCards(
       : p
   );
   const lanes = state.lanes.map((l, index) =>
-    index === laneIndex ? { ...l, pending: [...l.pending, ...cards] } : l
+    index === laneIndex
+      ? { ...l, pending: [...l.pending, ...cards.map((card) => ({ card, faceUp: false }))] }
+      : l
   );
 
   return { state: { ...state, players, lanes }, insertedCoins, target };

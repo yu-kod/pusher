@@ -44,7 +44,7 @@ export function resolvePush(
 
   // 4-1. 押し込み — 滞留の奥側から、投入コイン数ぶんだけレーンへ移す
   const pushedCount = Math.min(insertedCoins, lane.pending.length);
-  const pushedCards = lane.pending.slice(0, pushedCount);
+  const pushedCards = lane.pending.slice(0, pushedCount).map((p) => p.card);
   const remainingPending = lane.pending.slice(pushedCount);
 
   // 押し込んだカードはレーンの奥（末尾）へ入る

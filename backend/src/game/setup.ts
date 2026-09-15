@@ -20,11 +20,22 @@ export type Player = {
   hand: Card[];
 };
 
+/**
+ * 滞留エリアのカード1枚。
+ *
+ * 通常は裏向き（`faceUp: false`）で、公開情報は枚数だけ。
+ * 「横穴開放」（§6）で表向きになったカードは、以後も表向きのまま滞留し続ける。
+ */
+export type PendingCard = {
+  card: Card;
+  faceUp: boolean;
+};
+
 export type Lane = {
   /** 奥の山。裏向きで、中身は誰にも分からない */
   stock: Card[];
-  /** 滞留エリア。裏向きで、公開情報は枚数だけ */
-  pending: Card[];
+  /** 滞留エリア。添字 0 が奥側（レーンに近い側）で、先に入ったカードから押し込まれる */
+  pending: PendingCard[];
   /** 投入口増設マーカー（§6）。置かれると誰でも2枚同時に投入できる */
   hasExtraSlot: boolean;
 };

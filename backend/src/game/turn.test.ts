@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { createRng } from "./rng.js";
 import { DEFAULT_GAME_CONFIG, setupGame } from "./setup.js";
+import { faceDown } from "../test-utils/cards.js";
 import { calculateTarget, classifyRoll, insertCards, type RollOutcome } from "./turn.js";
 
 describe("calculateTarget", () => {
@@ -93,7 +94,10 @@ describe("insertCards", () => {
     );
     const lanes = base.lanes.map((lane, i) =>
       i === 0
-        ? { ...lane, pending: Array.from({ length: pendingCount }, () => base.drawPile[0]!) }
+        ? {
+            ...lane,
+            pending: faceDown(Array.from({ length: pendingCount }, () => base.drawPile[0]!)),
+          }
         : lane
     );
     return { ...base, players, lanes };
@@ -105,7 +109,10 @@ describe("insertCards", () => {
     const result = insertCards(state, 0, [0]);
 
     expect(result.state.lanes[0]?.pending).toHaveLength(1);
-    expect(result.state.lanes[0]?.pending[0]).toEqual({ kind: "coin", coins: 2 });
+    expect(result.state.lanes[0]?.pending[0]).toEqual({
+      card: { kind: "coin", coins: 2 },
+      faceUp: false,
+    });
   });
 
   it("投入したカードを手札から取り除く", () => {

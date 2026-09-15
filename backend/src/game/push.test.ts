@@ -1,10 +1,9 @@
 import { describe, expect, it } from "vitest";
-import type { Card, CoinCount } from "./deck.js";
+import type { Card } from "./deck.js";
 import { createRng } from "./rng.js";
 import { DEFAULT_GAME_CONFIG, setupGame, type GameState } from "./setup.js";
+import { coin, faceDown } from "../test-utils/cards.js";
 import { addToHand, resolvePush } from "./push.js";
-
-const coin = (coins: CoinCount): Card => ({ kind: "coin", coins });
 
 /** レーン0 の中身と滞留、山札を指定した状態を作る */
 function buildState(options: { stock?: Card[]; pending?: Card[]; drawPile?: Card[] }): GameState {
@@ -13,7 +12,7 @@ function buildState(options: { stock?: Card[]; pending?: Card[]; drawPile?: Card
     ...base,
     lanes: base.lanes.map((lane, i) =>
       i === 0
-        ? { ...lane, stock: options.stock ?? [], pending: options.pending ?? [] }
+        ? { ...lane, stock: options.stock ?? [], pending: faceDown(options.pending ?? []) }
         : { ...lane, stock: [], pending: [] }
     ),
     drawPile: options.drawPile ?? [],
@@ -44,7 +43,7 @@ describe("resolvePush", () => {
       const result = resolvePush(state, 0, 2);
 
       // 先頭2枚が押し込まれ、残りは最後の1枚
-      expect(result.state.lanes[0]?.pending).toEqual([coin(3)]);
+      expect(result.state.lanes[0]?.pending).toEqual(faceDown([coin(3)]));
     });
 
     it("§4-1 の例どおり滞留に3枚が残る", () => {
