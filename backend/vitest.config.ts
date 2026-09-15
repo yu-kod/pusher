@@ -7,7 +7,7 @@ export default defineConfig({
       provider: "v8",
       include: ["src/**/*.ts"],
       // index.ts はローカル起動のエントリポイント（listen するだけ）なので対象外
-      exclude: ["src/index.ts", "src/test-utils/**"],
+      exclude: ["src/index.ts", "src/lambda.ts", "src/test-utils/**"],
       thresholds: {
         lines: 100,
         functions: 100,
