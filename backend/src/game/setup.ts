@@ -3,7 +3,8 @@
  *
  * 状態は不変に扱う。各関数は引数の状態を変更せず、新しい状態を返す。
  */
-import { DEFAULT_DECK_CONFIG, createDeck, type Card, type DeckConfig } from "./deck.js";
+import { type Balance } from "./balance.js";
+import { createDeck, type Card } from "./deck.js";
 import type { Rng } from "./rng.js";
 
 export type PlayerId = string;
@@ -43,7 +44,7 @@ export type Lane = {
 export type GamePhase = "playing" | "finished";
 
 export type GameState = {
-  config: GameConfig;
+  config: Balance;
   lanes: Lane[];
   players: Player[];
   /** 山札 */
@@ -59,38 +60,6 @@ export type GameState = {
   phase: GamePhase;
 };
 
-/**
- * ルールの数値。
- *
- * docs/spec.md §7 のとおり**すべて暫定**で、シミュレーション（#13）で調整する。
- * マジックナンバーを実装に散らさず、ここに集約する。
- */
-export type GameConfig = {
-  deck: DeckConfig;
-  /** レーンの本数（§1）。§7 で 3 本も検証する */
-  laneCount: number;
-  /** セットアップで各レーンの奥に置く枚数（§2） */
-  initialLaneCards: number;
-  /** セットアップで各プレイヤーに配る枚数（§2） */
-  initialHandSize: number;
-  /** 手札上限（§3） */
-  handLimit: number;
-  /** この数のラウンドが終わったらゲーム終了（§3） */
-  maxRounds: number;
-  /** ジャックポットカウンターがこの値に達すると JP判定を行う（§5）。カウンターの上限でもある */
-  jackpotThreshold: number;
-};
-
-export const DEFAULT_GAME_CONFIG: GameConfig = {
-  deck: DEFAULT_DECK_CONFIG,
-  laneCount: 4,
-  initialLaneCards: 5,
-  initialHandSize: 5,
-  handLimit: 7,
-  maxRounds: 12,
-  jackpotThreshold: 5,
-};
-
 /** 3〜4人用（docs/spec.md 冒頭） */
 const MIN_PLAYERS = 3;
 const MAX_PLAYERS = 4;
@@ -104,7 +73,7 @@ const MAX_PLAYERS = 4;
  * 4. ジャックポットカウンターを 0 に置く
  * 5. 残りを山札とする
  */
-export function setupGame(playerNames: readonly string[], rng: Rng, config: GameConfig): GameState {
+export function setupGame(playerNames: readonly string[], rng: Rng, config: Balance): GameState {
   if (playerNames.length < MIN_PLAYERS || playerNames.length > MAX_PLAYERS) {
     throw new RangeError(
       `プレイヤーは ${MIN_PLAYERS}〜${MAX_PLAYERS} 人である必要がある: ${playerNames.length} 人`

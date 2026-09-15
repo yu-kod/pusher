@@ -1,13 +1,14 @@
 import { describe, expect, it } from "vitest";
 import type { Card } from "./deck.js";
 import { createRng } from "./rng.js";
-import { DEFAULT_GAME_CONFIG, setupGame, type GameState } from "./setup.js";
+import { DEFAULT_BALANCE } from "./balance.js";
+import { setupGame, type GameState } from "./setup.js";
 import { coin, faceDown } from "../test-utils/cards.js";
 import { addToHand, resolvePush } from "./push.js";
 
 /** レーン0 の中身と滞留、山札を指定した状態を作る */
 function buildState(options: { stock?: Card[]; pending?: Card[]; drawPile?: Card[] }): GameState {
-  const base = setupGame(["A", "B", "C"], createRng(1), DEFAULT_GAME_CONFIG);
+  const base = setupGame(["A", "B", "C"], createRng(1), DEFAULT_BALANCE);
   return {
     ...base,
     lanes: base.lanes.map((lane, i) =>

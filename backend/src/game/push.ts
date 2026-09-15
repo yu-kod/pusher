@@ -27,7 +27,7 @@ export type PushResult = {
  * 押し出しを解決する（docs/spec.md §4）。
  *
  * `insertedCoins` は投入カードのコイン数（2枚同時投入なら合計）。
- * これが押し込める枚数の上限になる。
+ * 押し込める枚数は balance.pushCount がここから決める（既定はコイン数そのまま）。
  */
 export function resolvePush(
   state: GameState,
@@ -42,8 +42,9 @@ export function resolvePush(
     throw new RangeError(`押し込み枚数は 1 以上の整数である必要がある: ${insertedCoins}`);
   }
 
-  // 4-1. 押し込み — 滞留の奥側から、投入コイン数ぶんだけレーンへ移す
-  const pushedCount = Math.min(insertedCoins, lane.pending.length);
+  // 4-1. 押し込み — 滞留の奥側から、押し込める枚数ぶんだけレーンへ移す。
+  // 「コイン数ぶん」は既定のルールで、balance.pushCount で差し替えられる（§7）
+  const pushedCount = Math.min(state.config.pushCount(insertedCoins), lane.pending.length);
   const pushedCards = lane.pending.slice(0, pushedCount).map((p) => p.card);
   const remainingPending = lane.pending.slice(pushedCount);
 

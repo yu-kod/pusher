@@ -54,7 +54,8 @@ export type JackpotRollResult = {
  *
  * d6 を1個振り、6 が出れば手番プレイヤーがプールのカードを全獲得する。
  *
- * - 当選: プールを空にし、カウンターを 0 に戻す（docs/spec.md のルール解釈メモ）
+ * - 当選: プールを空にし、カウンターを 0 に戻す（docs/spec.md のルール解釈メモ）。
+ *   balance.jackpotPayoutRatio を下げると一部だけ獲得し、残りは持ち越す
  * - 外れ: カウンターは据え置き。以後、誰かが横穴を出すたびに再判定できる
  */
 export function rollJackpot(state: GameState, rng: Pick<Rng, "rollD6">): JackpotRollResult {
@@ -68,13 +69,18 @@ export function rollJackpot(state: GameState, rng: Pick<Rng, "rollD6">): Jackpot
     return { state, roll, won: false, wonCards: [] };
   }
 
-  const wonCards = state.jackpotPool;
+  // 既定は全獲得。jackpotPayoutRatio を下げるとプールの一部だけを獲得し、
+  // 残りは次のジャックポットへ持ち越す（§7 次点の検証項目）
+  const wonCount = Math.floor(state.jackpotPool.length * state.config.jackpotPayoutRatio);
+  const wonCards = state.jackpotPool.slice(0, wonCount);
+  const carriedOver = state.jackpotPool.slice(wonCount);
+
   const players = state.players.map((p, index) =>
     index === state.currentPlayerIndex ? { ...p, hand: [...p.hand, ...wonCards] } : p
   );
 
   return {
-    state: { ...state, players, jackpotPool: [], jackpotCounter: 0 },
+    state: { ...state, players, jackpotPool: carriedOver, jackpotCounter: 0 },
     roll,
     won: true,
     wonCards,
