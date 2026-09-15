@@ -97,6 +97,6 @@ jobs:
           echo "::error::health check failed at $url/api/health"
           exit 1
 
+      # 失敗時に空の URL で「Deployed to」と書かないよう、成功時のみ出す
       - name: Summary
-        if: always()
         run: echo "### Deployed to ${{ steps.tf.outputs.app_url }}" >> "$GITHUB_STEP_SUMMARY"
