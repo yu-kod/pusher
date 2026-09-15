@@ -7,12 +7,12 @@ variable "aws_region" {
 variable "project_name" {
   description = "リソース名の接頭辞"
   type        = string
-  default     = "pusher"
+  default     = "pusher-table"
 }
 
 variable "domain_name" {
   description = <<-DESC
-    公開するカスタムドメイン（例: pusher.example.com）。
+    公開するカスタムドメイン（例: pusher-table.example.com）。
 
     空文字にすると CloudFront の既定ドメインで公開し、ACM 証明書と Route 53 の
     レコードを作らない。ドメインを用意していない段階ではこちらで始められる。

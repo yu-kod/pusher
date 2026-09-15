@@ -6,6 +6,6 @@ describe("App", () => {
   it("タイトルを表示する", () => {
     render(<App />);
 
-    expect(screen.getByRole("heading", { name: "PUSHER" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "PUSHER TABLE" })).toBeInTheDocument();
   });
 });

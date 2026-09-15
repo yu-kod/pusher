@@ -4,10 +4,10 @@ terraform {
   # ブートストラップ（infra/bootstrap）で作ったバケットとテーブルを指す。
   # backend の設定には変数を使えないため直書きする。
   backend "s3" {
-    bucket         = "pusher-tfstate"
+    bucket         = "pusher-table-tfstate"
     key            = "terraform.tfstate"
     region         = "ap-northeast-1"
-    dynamodb_table = "pusher-tfstate-lock"
+    dynamodb_table = "pusher-table-tfstate-lock"
     encrypt        = true
   }
 
