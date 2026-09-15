@@ -1,14 +1,14 @@
 /**
  * 押し出しの解決（docs/spec.md §4）。
  *
- * 押し出しに成功したら 4-1 押し込み → 4-2 落下 → 4-3 補充 の順に処理する。
+ * 押し出しに成功したら 4-1 押し込み → 4-2 落下 の順に処理する。補充は行わない（§4-3）。
  *
- * 落ちたカードの行き先はここでは決めない。通常の成功なら押し出したプレイヤーの手札へ、
- * 横穴ならジャックポットプールへ入る（§5 / #10）ため、呼び出し側が振り分ける。
+ * 落ちたカードの行き先はここでは決めない。得点にするのは collectFallenCards、
+ * 横穴なら未確定得点ごとジャックポットへ移る（§5）ため、呼び出し側が振り分ける。
  *
  * ## 配列の向き
  *
- * - `lane.stock` — 添字 0 が末端（落下口）側、末尾が奥側。落下は先頭から、押し込みと補充は末尾へ
+ * - `lane.stock` — 添字 0 が末端（落下口）側、末尾が奥側。落下は先頭から、押し込みは末尾へ
  * - `lane.pending` — 添字 0 が奥側（レーンに近い側）。先に入ったカードから押し込まれる
  */
 import { isCoinCard, isEventCard, type Card } from "./deck.js";
@@ -56,19 +56,13 @@ export function resolvePush(
   const fallenCards = afterPush.slice(0, pushedCount);
   const afterFall = afterPush.slice(pushedCount);
 
-  // 4-3. 補充 — 落下した枚数ぶんを山札からレーンの奥へ
-  const refillCount = Math.min(fallenCards.length, state.drawPile.length);
-  const refill = state.drawPile.slice(0, refillCount);
-
+  // 4-3. 補充は行わない — 押し込んだ枚数と落ちた枚数が等しいため、
+  // レーンの厚みはこれで一定に保たれる（docs/spec.md §4-3）
   const lanes = state.lanes.map((l, index) =>
-    index === laneIndex ? { ...l, stock: [...afterFall, ...refill], pending: remainingPending } : l
+    index === laneIndex ? { ...l, stock: afterFall, pending: remainingPending } : l
   );
 
-  return {
-    state: { ...state, lanes, drawPile: state.drawPile.slice(refillCount) },
-    pushedCount,
-    fallenCards,
-  };
+  return { state: { ...state, lanes }, pushedCount, fallenCards };
 }
 
 /**
