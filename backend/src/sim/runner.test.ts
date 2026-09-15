@@ -57,7 +57,7 @@ describe("simulateGame", () => {
 
   it("プリセットを差し替えて回せる", () => {
     const stats = simulateGame(
-      withPreset("pushHalf"),
+      withPreset("pushFull"),
       expectedValueStrategy(),
       createRng(1),
       PLAYERS
@@ -119,7 +119,8 @@ describe("summarize", () => {
     const summary = summarize(stats);
 
     expect(summary.seatWinRates).toHaveLength(PLAYERS);
-    expect(summary.seatWinRates.reduce((a, b) => a + b, 0)).toBeGreaterThanOrEqual(1);
+    // 引き分けは全員を勝者として数えるので合計は 1 以上。浮動小数の誤差を見込む
+    expect(summary.seatWinRates.reduce((a, b) => a + b, 0)).toBeGreaterThan(0.99);
   });
 
   it("ゲームが 0 件でも壊れない", () => {

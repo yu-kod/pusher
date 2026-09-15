@@ -3,7 +3,7 @@
  *
  *   npm run sim                          既定値で 2000 ゲーム
  *   npm run sim -- --games 5000          回数を変える
- *   npm run sim -- --preset pushHalf     プリセットを重ねる（複数可）
+ *   npm run sim -- --preset pushFull     プリセットを重ねる（複数可）
  *   npm run sim -- --strategy random     戦略を変える
  *   npm run sim -- --players 3 --seed 7
  *

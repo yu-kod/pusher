@@ -82,7 +82,7 @@ describe("resolveInsertionRound（投入ラウンド）", () => {
   it("成功したレーンは押し出しを解決し、落ちたカードを返す（docs/spec.md §4）", () => {
     const state = buildState([2], [{ stock: [coin(3), coin(1)], pending: faceDown([coin(1)]) }]);
 
-    // 目標値 = 2(コイン) + 1(滞留) = 3。出目3で成功
+    // 目標値 = 2(コイン) + 1(滞留) = 3。出目3で成功。押し込みは ceil(2/2) = 1枚
     const result = resolveInsertionRound(
       state,
       [{ laneIndex: 0, handIndexes: [0] }],
@@ -90,7 +90,7 @@ describe("resolveInsertionRound（投入ラウンド）", () => {
       scriptedRng([3])
     );
 
-    expect(result.lanes[0]?.fallenCards).toEqual([coin(3), coin(1)]);
+    expect(result.lanes[0]?.fallenCards).toEqual([coin(3)]);
   });
 
   it("失敗したレーンからは何も落ちず、投入カードが滞留に残る（docs/spec.md §3）", () => {
@@ -120,8 +120,8 @@ describe("resolveInsertionRound（投入ラウンド）", () => {
       scriptedRng([3])
     );
 
-    expect(result.state.pendingPoints).toBe(5);
-    expect(result.gainedPoints).toBe(5);
+    expect(result.state.pendingPoints).toBe(3);
+    expect(result.gainedPoints).toBe(3);
   });
 
   it("未確定得点は前のラウンドぶんに積み増す", () => {
@@ -136,9 +136,9 @@ describe("resolveInsertionRound（投入ラウンド）", () => {
       scriptedRng([3])
     );
 
-    expect(result.state.pendingPoints).toBe(12);
+    expect(result.state.pendingPoints).toBe(10);
     // gainedPoints はこのラウンドで得た点数だけを返す
-    expect(result.gainedPoints).toBe(5);
+    expect(result.gainedPoints).toBe(3);
   });
 
   it("未確定得点はまだ手番プレイヤーの得点にならない（docs/spec.md §3）", () => {

@@ -24,6 +24,18 @@ export type Balance = {
   /** セットアップで各レーンの奥に置く枚数（§2） */
   initialLaneCards: number;
 
+  /**
+   * セットアップで各レーンの**滞留エリア**に裏向きで置く枚数（§2）。
+   *
+   * 0 だとゲーム開始時の滞留が空になり、先手は押し込めるのが1枚だけの状態で動く。
+   * 実測では手番順ごとの勝率が 0.14 / 0.27 / 0.29 / 0.31 と壊れていた（#54）。
+   * 開始時点から滞留があれば、全員が同じ条件で始められる。
+   *
+   * 滞留の厚みの初期値そのものでもあるため、§7 最優先「滞留の厚み 3〜5枚」にも効く（#53）。
+   * → プリセット initialPending0（#54 以前の挙動）/ initialPending3 で比較する。
+   */
+  initialPendingCards: number;
+
   /** セットアップで各プレイヤーに配る枚数（§2） */
   initialHandSize: number;
 
@@ -98,9 +110,13 @@ export type Balance = {
    *
    * 「投入口増設」（§6）で2枚同時に投入した場合はコイン数の合計を受け取る。
    *
-   * §7 最優先「滞留の厚み：狙いどおり3〜5枚で推移するか。薄すぎる（＝すぐ刈られる）なら
-   * 押し込み枚数を『コイン数 ÷ 2（切り上げ）』に圧縮する。厚すぎるなら『コイン数＋1』に
-   * 増やす」→ プリセット pushHalf / pushPlusOne で比較する。
+   * 既定は「コイン数 ÷ 2（切り上げ）」。#53 のシミュレーションで「コイン数そのまま」だと
+   * 滞留が 1.10 枚しか育たなかったため圧縮した（§7 の目標 3〜5 枚）。
+   * → プリセット pushFull（コイン数そのまま）/ pushPlusOne で比較できる。
+   *
+   * なお §7 は「厚すぎるならコイン数＋1に増やす」としていたが、押し込み枚数を増やすと
+   * 除去量が増えて滞留は**薄くなる**。実測でも 0.83 枚まで薄くなり、記述が逆だったことが
+   * 確認された。
    */
   pushCount: (totalCoins: number) => number;
 
@@ -124,6 +140,7 @@ const LANE_COUNT = 3;
 export const DEFAULT_BALANCE: Balance = {
   laneCount: LANE_COUNT,
   initialLaneCards: 5,
+  initialPendingCards: 5,
   initialHandSize: 5,
   deck: DEFAULT_DECK_CONFIG,
 
@@ -134,7 +151,7 @@ export const DEFAULT_BALANCE: Balance = {
   handLimit: null,
   maxRounds: 12,
 
-  pushCount: (totalCoins) => totalCoins,
+  pushCount: (totalCoins) => Math.ceil(totalCoins / 2),
 
   jackpotThreshold: 5,
   jackpotPayoutRatio: 1,
@@ -153,13 +170,14 @@ export const BALANCE_PRESETS = {
   lanes4: { laneCount: 4, maxLanesPerRound: 4 },
 
   /**
-   * §7 次点: 3コイン札の比率をコイン札の 15% まで下げる。
+   * #53 以前の既定: 3コイン札をコイン札の 25% に戻す。
    *
-   * コイン札は 76 枚なので 15% は 11 枚。減らした 8 枚は既定の 1:2 の比（40:35）で
-   * 1コイン札と2コイン札へ配分し、総枚数を既定と揃える。
-   *   1コイン 35 (46.1%) / 2コイン 30 (39.5%) / 3コイン 11 (14.5%)
+   *   1コイン 30 (39.5%) / 2コイン 27 (35.5%) / 3コイン 19 (25.0%)
+   *
+   * 既定は 14.5%。3コイン札は目標値が高く押し込み枚数も多い二重の優位があり、
+   * 25% では投入1枚あたりの回収が 1.99 まで膨らむ（§7 次点）。
    */
-  coin3Ratio15: { deck: { ...DEFAULT_DECK_CONFIG, coins: { 1: 35, 2: 30, 3: 11 } } },
+  coin3Ratio25: { deck: { ...DEFAULT_DECK_CONFIG, coins: { 1: 30, 2: 27, 3: 19 } } },
 
   /** §7: ラウンド終了時のドローを廃止する */
   noRoundDraw: { roundDrawCount: 0 },
@@ -168,13 +186,18 @@ export const BALANCE_PRESETS = {
   /** §7: ドローを3枚に増やす（全レーンへ撒き続けられる） */
   roundDraw3: { roundDrawCount: 3 },
 
-  /** §7 最優先: 押し込み枚数をコイン数 ÷ 2（切り上げ）に圧縮する */
-  pushHalf: { pushCount: (totalCoins: number) => Math.ceil(totalCoins / 2) },
-  /** §7 最優先: 押し込み枚数をコイン数 + 1 に増やす */
+  /** #53 以前の既定: 押し込み枚数をコイン数そのままにする（滞留 1.10 枚） */
+  pushFull: { pushCount: (totalCoins: number) => totalCoins },
+  /** §7: 押し込み枚数をコイン数 + 1 に増やす（滞留 0.83 枚。さらに薄くなる） */
   pushPlusOne: { pushCount: (totalCoins: number) => totalCoins + 1 },
 
   /** §7 次点: JP当選時にプールの半分だけ獲得し、残りを次へ持ち越す */
   jackpotHalfCarryOver: { jackpotPayoutRatio: 0.5 },
+
+  /** #54 以前の挙動: 滞留が空の状態から始める（先手の勝率が 0.14 まで落ちる） */
+  initialPending0: { initialPendingCards: 0 },
+  /** #53 #54: 初期滞留を 3 枚にする */
+  initialPending3: { initialPendingCards: 3 },
 
   /** §7 次点: 手札上限を 7 枚に設ける（§3 の原案） */
   handLimit7: { handLimit: 7 },

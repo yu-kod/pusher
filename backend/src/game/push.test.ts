@@ -1,14 +1,19 @@
 import { describe, expect, it } from "vitest";
 import type { Card } from "./deck.js";
 import { createRng } from "./rng.js";
-import { DEFAULT_BALANCE } from "./balance.js";
+import { withPreset } from "./balance.js";
 import { setupGame, type GameState } from "./setup.js";
 import { coin, faceDown } from "../test-utils/cards.js";
 import { bankPendingPoints, collectFallenCards, resolvePush } from "./push.js";
 
-/** レーン0 の中身と滞留、山札を指定した状態を作る */
+/**
+ * レーン0 の中身と滞留、山札を指定した状態を作る。
+ *
+ * 押し込み枚数の**式**は調整値なので balance.test.ts で検証する。ここでは
+ * 「投入コイン数 = 押し込み枚数」に固定して、押し込みと落下の**順序と枚数の対応**だけを見る。
+ */
 function buildState(options: { stock?: Card[]; pending?: Card[]; drawPile?: Card[] }): GameState {
-  const base = setupGame(["A", "B", "C"], createRng(1), DEFAULT_BALANCE);
+  const base = setupGame(["A", "B", "C"], createRng(1), withPreset("pushFull"));
   return {
     ...base,
     lanes: base.lanes.map((lane, i) =>

@@ -85,18 +85,19 @@ describe("DEFAULT_DECK_CONFIG", () => {
     }
   });
 
-  it("コインカードの構成比が 40 / 35 / 25 に近い（docs/spec.md §1）", () => {
+  it("コインカードの構成比が 46 / 39 / 15 に近い（docs/spec.md §1）", () => {
     const coins = deck.filter(isCoinCard);
     expect(coins).toHaveLength(76);
 
+    // 3コイン札は #53 のシミュレーションで 25% → 15% に下げた
     const ratio = (n: 1 | 2 | 3) => coins.filter((c) => c.coins === n).length / coins.length;
-    expect(ratio(1)).toBeCloseTo(0.4, 1);
-    expect(ratio(2)).toBeCloseTo(0.35, 1);
-    expect(ratio(3)).toBeCloseTo(0.25, 1);
+    expect(ratio(1)).toBeCloseTo(0.46, 1);
+    expect(ratio(2)).toBeCloseTo(0.39, 1);
+    expect(ratio(3)).toBeCloseTo(0.15, 1);
   });
 
   it("場に出る枚数の2倍以上ある（docs/spec.md §1）", () => {
-    // レーン 3×5 + 滞留 3×3 + 手札 4×5 = 44 枚が場に出る。
+    // レーン 3×5 + 滞留 3×5 + 手札 4×5 = 50 枚が場に出る。
     // 落下カードは山札へ戻る閉じた循環なので、その2倍あれば山札は枯れない
     expect(deck.length).toBeGreaterThanOrEqual(44 * 2);
   });
