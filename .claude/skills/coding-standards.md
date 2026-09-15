@@ -30,7 +30,7 @@ triggers:
 - ネットワーク・DB・ファイル・時刻・乱数に触れない
 - **乱数は `Rng` を引数で注入する。`Math.random()` を呼ばない**
   - ESLint の `no-restricted-properties` で `src/game/**` の `Math.random()` を禁止済み。ルールを緩めない
-  - テストでは固定値を返す `constantRng` / 出目を並べた `sequenceRng` を使う
+  - テストでは決定的な `Rng` を注入する。固定の出目を返すヘルパーが要るようになったら `src/test-utils/` に置く
 - 状態は不変に扱う。引数のオブジェクトを破壊的に変更せず、新しい状態を返す
 - ログ出力もエンジンに混ぜない。記録が必要なら「何が起きたか」を戻り値のイベント列として返し、呼び出し側が記録する
 
@@ -145,7 +145,7 @@ expect(res.status).toBe(201);
 - `vi.hoisted()` で `vi.mock` ファクトリから参照する変数を宣言
 - デフォルトは実装をそのまま使う。モックするのは: ネットワーク、タイマー、非決定的な値のみ
 - `restoreMocks: true` を vitest config に設定済み
-- **ゲームエンジンはモックしない。** 乱数を `Rng` で注入する設計なので、決定的な `Rng` を渡せばモックは不要
+- **ゲームエンジンはモックしない。** 乱数を `Rng` で注入する設計なので、決定的な `Rng` を渡せばモックは不要（シードを固定した `createRng(seed)` か、`src/test-utils/` のヘルパーを使う）
 - **Vitest 4 の注意**: `beforeEach` で `mockReset()` している共有 `vi.fn()` に対し、同じテスト内で `mockResolvedValue` → `mockRejectedValue` と差し替えると、拒否したエラーが未処理扱いになりテストが失敗する。失敗系はテストごとに新しい `vi.fn().mockRejectedValue(...)` を作って注入する
 
 ### テストデータ
