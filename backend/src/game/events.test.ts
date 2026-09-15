@@ -36,7 +36,25 @@ describe("resolveAvalanche（なだれ）", () => {
 
     const result = resolveAvalanche(state);
 
-    expect(result.fallenCards).toEqual([coin(1), coin(3), coin(1)]);
+    expect(result.lanes).toEqual([
+      { laneIndex: 0, fallenCards: [coin(1)] },
+      { laneIndex: 1, fallenCards: [coin(3)] },
+      { laneIndex: 2, fallenCards: [coin(1)] },
+    ]);
+  });
+
+  it("どのレーンから落ちたかが分かる形で返す（§6「もう1枚落とす」に要る）", () => {
+    const state = buildState([
+      { stock: [coin(1)], pending: faceDown([coin(2)]) },
+      {},
+      { stock: [coin(3)], pending: faceDown([coin(2)]) },
+    ]);
+
+    expect(resolveAvalanche(state).lanes).toEqual([
+      { laneIndex: 0, fallenCards: [coin(1)] },
+      { laneIndex: 1, fallenCards: [] },
+      { laneIndex: 2, fallenCards: [coin(3)] },
+    ]);
   });
 
   it("滞留が空のレーンからは何も落ちない", () => {
@@ -46,7 +64,7 @@ describe("resolveAvalanche（なだれ）", () => {
       { stock: [coin(1)], pending: [] },
     ]);
 
-    expect(resolveAvalanche(state).fallenCards).toEqual([coin(1)]);
+    expect(resolveAvalanche(state).lanes.flatMap((l) => l.fallenCards)).toEqual([coin(1)]);
   });
 
   it("押し込むのは各レーン1枚だけ（滞留が厚くても）", () => {
@@ -59,7 +77,7 @@ describe("resolveAvalanche（なだれ）", () => {
 
     const result = resolveAvalanche(state);
 
-    expect(result.fallenCards).toHaveLength(1);
+    expect(result.lanes.flatMap((l) => l.fallenCards)).toHaveLength(1);
     expect(result.state.lanes[0]?.pending).toHaveLength(2);
   });
 
@@ -80,7 +98,7 @@ describe("resolveAvalanche（なだれ）", () => {
 
     const result = resolveAvalanche(state);
 
-    expect(result.fallenCards).toEqual([]);
+    expect(result.lanes.every((l) => l.fallenCards.length === 0)).toBe(true);
     expect(result.state.lanes).toEqual(state.lanes);
   });
 

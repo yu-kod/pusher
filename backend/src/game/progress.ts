@@ -4,9 +4,10 @@
  * 投入ラウンドの中身は round.ts が担う。ここはその外側——手番を閉じて次へ回し、
  * ラウンドとゲームを終わらせるところ。
  */
-import type { Card } from "./deck.js";
+import { isCoinCard, isEventCard, type Card } from "./deck.js";
 import { settleJackpotAtGameEnd } from "./jackpot.js";
 import { bankPendingPoints } from "./push.js";
+import { resolveDrawnEvent, type EventChooser, type ResolvedEvent } from "./resolve.js";
 import type { Rng } from "./rng.js";
 import type { GameState, Player } from "./setup.js";
 
@@ -44,12 +45,15 @@ export type EndRoundResult = {
   deckExhausted: boolean;
   /** このラウンドでゲームが終わったか。true なら state.phase は "finished" */
   gameOver: boolean;
+  /** ドローで引いて即座に解決したイベント（§6） */
+  events: ResolvedEvent[];
 };
 
 /**
  * ラウンド終了処理を行う（docs/spec.md §3）。
  *
  * - 各プレイヤーが山札から `config.roundDrawCount` 枚ドローする。手札に上限はない
+ * - 引いたイベントカードはその場で解決して捨て札にする。手札には入れない（§6）
  * - 各レーンへ `config.roundLaneRefillCount` 枚補充する（既定は 0。§4-3）
  * - ラウンド番号を1つ進める
  *
@@ -59,7 +63,11 @@ export type EndRoundResult = {
  * 最終ラウンドを終えたか、山札も捨て札も尽きたらゲーム終了。未払い出しの
  * ジャックポットを処理し、`phase` を "finished" にする（§5）。
  */
-export function endRound(state: GameState, rng: Pick<Rng, "shuffle">): EndRoundResult {
+export function endRound(
+  state: GameState,
+  rng: Pick<Rng, "shuffle" | "rollD6">,
+  chooser: EventChooser
+): EndRoundResult {
   let drawPile = state.drawPile;
   let discardPile = state.discardPile;
   let deckExhausted = false;
@@ -86,29 +94,51 @@ export function endRound(state: GameState, rng: Pick<Rng, "shuffle">): EndRoundR
     return taken;
   };
 
-  const players = state.players.map((player) => ({
-    ...player,
-    hand: [...player.hand, ...drawCards(state.config.roundDrawCount)],
-  }));
+  // イベントカードは手札に入れず、あとでその場で解決する（§6）
+  const drawn = state.players.map((player) => {
+    const cards = drawCards(state.config.roundDrawCount);
+    return {
+      player: { ...player, hand: [...player.hand, ...cards.filter(isCoinCard)] },
+      events: cards.filter(isEventCard),
+    };
+  });
 
   const lanes = state.lanes.map((lane) => ({
     ...lane,
     stock: [...lane.stock, ...drawCards(state.config.roundLaneRefillCount)],
   }));
 
-  const next: GameState = {
+  let next: GameState = {
     ...state,
-    players,
+    players: drawn.map((d) => d.player),
     lanes,
     drawPile,
     discardPile,
     round: state.round + 1,
   };
 
+  // 引いたイベントを、引いた本人のものとして解決する（docs/spec.md のルール解釈メモ）。
+  // 手番中ではないので、得点は未確定得点にせずその場で確定させる
+  const events: ResolvedEvent[] = [];
+  drawn.forEach((d, drawerIndex) => {
+    if (d.events.length === 0) {
+      return;
+    }
+
+    let drawer: GameState = { ...next, currentPlayerIndex: drawerIndex };
+    for (const card of d.events) {
+      const resolved = resolveDrawnEvent(drawer, card.event, chooser, rng);
+      drawer = resolved.state;
+      events.push(...resolved.events);
+    }
+
+    next = { ...bankPendingPoints(drawer), currentPlayerIndex: next.currentPlayerIndex };
+  });
+
   // §3 ゲーム終了 — 12ラウンド経過、または山札も捨て札も尽きた時点
   const gameOver = deckExhausted || next.round > state.config.maxRounds;
   if (!gameOver) {
-    return { state: next, deckExhausted, gameOver };
+    return { state: next, deckExhausted, gameOver, events };
   }
 
   // §5 未払い出しのジャックポットの最終処理
@@ -116,6 +146,7 @@ export function endRound(state: GameState, rng: Pick<Rng, "shuffle">): EndRoundR
     state: { ...settleJackpotAtGameEnd(next), phase: "finished" },
     deckExhausted,
     gameOver,
+    events,
   };
 }
 

@@ -22,10 +22,21 @@ import type { GameState } from "./setup.js";
 /** 「抽選抽選」がカウンターを進める数（§6） */
 const LOTTERY_COUNTER_ADVANCE = 2;
 
+/** 1レーンから落ちたカード */
+export type LaneFall = {
+  laneIndex: number;
+  fallenCards: Card[];
+};
+
 export type AvalancheResult = {
   state: GameState;
-  /** 全レーンから落ちたカード。レーン順に並ぶ */
-  fallenCards: Card[];
+  /**
+   * レーンごとの落下カード。全レーンぶんがレーン順に並ぶ（何も落ちなかったレーンも含む）。
+   *
+   * §6 の「もう1枚落とす」はどのレーンから落ちたかを必要とするため、
+   * 平坦な配列ではなくレーンの対応を保って返す。
+   */
+  lanes: LaneFall[];
 };
 
 /**
@@ -38,15 +49,14 @@ export type AvalancheResult = {
  */
 export function resolveAvalanche(state: GameState): AvalancheResult {
   let current = state;
-  const fallenCards: Card[] = [];
 
-  for (let laneIndex = 0; laneIndex < current.lanes.length; laneIndex++) {
+  const lanes = state.lanes.map((_, laneIndex) => {
     const result = resolvePush(current, laneIndex, 1);
     current = result.state;
-    fallenCards.push(...result.fallenCards);
-  }
+    return { laneIndex, fallenCards: result.fallenCards };
+  });
 
-  return { state: current, fallenCards };
+  return { state: current, lanes };
 }
 
 export type OpenLaneResult = {
