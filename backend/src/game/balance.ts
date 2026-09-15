@@ -16,7 +16,7 @@ export type Balance = {
   /**
    * レーンの本数（§1）。
    *
-   * §7 次点「レーン4本が適正か：多いと滞留が分散して育たない。3本に減らす選択肢もある」
+   * §7 次点「レーン3本が適正か：少ないと滞留が集中して育ちやすい。4本に戻す選択肢もある」
    * → プリセット lanes3 / lanes4 で比較する。
    */
   laneCount: number;
@@ -50,13 +50,18 @@ export type Balance = {
   /**
    * ラウンド終了時に各プレイヤーがドローする枚数（§3）。
    *
-   * §7 最優先「ラウンド収入の要否：毎ラウンド1枚ドローが多すぎないか。ドローを廃止して
-   * 初期配布のみにすると『終盤に手札が尽きる』プレッシャーが生まれ、1枚あたりの重みが
-   * 増す」→ プリセット noRoundDraw（0枚）で比較する。
+   * 既定は 2 枚。毎手番2枚投入で収支が均衡し、3枚で消耗、1枚で蓄積する設計
+   * （§7 最優先「ドロー枚数と投入枚数の関係」）。
+   * → プリセット noRoundDraw（0枚）/ roundDraw1 / roundDraw3 で比較する。
    */
   roundDrawCount: number;
 
-  /** ラウンド終了時に各レーンの奥へ補充する枚数（§3） */
+  /**
+   * ラウンド終了時に各レーンの奥へ補充する枚数。
+   *
+   * v0.2 で 0 が既定。押し込みと落下が釣り合うためレーンの厚みは一定に保たれ、
+   * 補充するとレーンが増え続けて山札が枯れる（§4-3 / §8）。
+   */
   roundLaneRefillCount: number;
 
   /**
@@ -103,7 +108,7 @@ export type Balance = {
   jackpotPayoutRatio: number;
 };
 
-const LANE_COUNT = 4;
+const LANE_COUNT = 3;
 
 export const DEFAULT_BALANCE: Balance = {
   laneCount: LANE_COUNT,
@@ -112,8 +117,8 @@ export const DEFAULT_BALANCE: Balance = {
   deck: DEFAULT_DECK_CONFIG,
 
   maxLanesPerTurn: LANE_COUNT,
-  roundDrawCount: 1,
-  roundLaneRefillCount: 1,
+  roundDrawCount: 2,
+  roundLaneRefillCount: 0,
   handLimit: null,
   maxRounds: 12,
 
@@ -134,18 +139,23 @@ export const BALANCE_PRESETS = {
   lanes3: { laneCount: 3, maxLanesPerTurn: 3 },
   /** §7 次点: レーン4本（既定と同じ。比較対象として明示する） */
   lanes4: { laneCount: 4, maxLanesPerTurn: 4 },
+  /** §7: レーンを4本に戻す（v0.1 の構成） */
 
   /**
    * §7 次点: 3コイン札の比率をコイン札の 15% まで下げる。
    *
-   * コイン札は 170 枚なので 15% は 26 枚。減らした 16 枚は既定の 1:2 の比（40:35）で
+   * コイン札は 76 枚なので 15% は 11 枚。減らした 8 枚は既定の 1:2 の比（40:35）で
    * 1コイン札と2コイン札へ配分し、総枚数を既定と揃える。
-   *   1コイン 77 (45.3%) / 2コイン 67 (39.4%) / 3コイン 26 (15.3%)
+   *   1コイン 35 (46.1%) / 2コイン 30 (39.5%) / 3コイン 11 (14.5%)
    */
-  coin3Ratio15: { deck: { ...DEFAULT_DECK_CONFIG, coins: { 1: 77, 2: 67, 3: 26 } } },
+  coin3Ratio15: { deck: { ...DEFAULT_DECK_CONFIG, coins: { 1: 35, 2: 30, 3: 11 } } },
 
-  /** §7 最優先: ラウンド終了時のドローを廃止する */
+  /** §7: ラウンド終了時のドローを廃止する */
   noRoundDraw: { roundDrawCount: 0 },
+  /** §7: ドローを1枚に減らす（投入1枚で均衡する） */
+  roundDraw1: { roundDrawCount: 1 },
+  /** §7: ドローを3枚に増やす（全レーンへ撒き続けられる） */
+  roundDraw3: { roundDrawCount: 3 },
 
   /** §7 最優先: 押し込み枚数をコイン数 ÷ 2（切り上げ）に圧縮する */
   pushHalf: { pushCount: (totalCoins: number) => Math.ceil(totalCoins / 2) },

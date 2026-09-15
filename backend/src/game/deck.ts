@@ -44,13 +44,16 @@ export type DeckConfig = {
 /**
  * デッキ構成の既定値（暫定）。
  *
- * 総枚数 200 枚。内訳の根拠は docs/spec.md の「ルール解釈メモ」を参照。
- * - イベント 30 枚（全体の 15%。§1 の比率を優先し、§6 の「各2枚」は物理プロトタイプ向けと解釈）
- * - コイン 170 枚（コイン札の中で 40 / 35 / 25。端数は2コイン札へ寄せた）
+ * 総枚数 90 枚（docs/spec.md §1）。
+ * ポイント制により落下カードが山札へ戻るため、場に出ている枚数
+ * （レーン 3×5 + 滞留 3×3 + 手札 4×5 = 44枚）の約2倍で足りる。
+ *
+ * - イベント 14 枚（全体の約 15%）。4種に 4/4/3/3
+ * - コイン 76 枚（コイン札の中で 39.5 / 35.5 / 25.0）
  */
 export const DEFAULT_DECK_CONFIG: DeckConfig = {
-  coins: { 1: 68, 2: 60, 3: 42 },
-  events: { avalanche: 8, openLane: 8, extraSlot: 7, lottery: 7 },
+  coins: { 1: 30, 2: 27, 3: 19 },
+  events: { avalanche: 4, openLane: 4, extraSlot: 3, lottery: 3 },
 };
 
 function assertCount(count: number, label: string): void {

@@ -44,19 +44,17 @@ describe("resolveAvalanche（なだれ）", () => {
       { stock: [coin(1)], pending: faceDown([coin(2)]) },
       { stock: [coin(3)], pending: faceDown([coin(2)]) },
       { stock: [coin(1)], pending: faceDown([coin(2)]) },
-      { stock: [coin(1)], pending: faceDown([coin(2)]) },
     ]);
 
     const result = resolveAvalanche(state);
 
-    expect(result.fallenCards).toEqual([coin(1), coin(3), coin(1), coin(1)]);
+    expect(result.fallenCards).toEqual([coin(1), coin(3), coin(1)]);
   });
 
   it("滞留が空のレーンからは何も落ちない", () => {
     const state = buildState([
       { stock: [coin(1)], pending: faceDown([coin(2)]) },
       { stock: [coin(3)], pending: [] },
-      { stock: [coin(1)], pending: [] },
       { stock: [coin(1)], pending: [] },
     ]);
 
@@ -78,7 +76,7 @@ describe("resolveAvalanche（なだれ）", () => {
   });
 
   it("押し込んだあと補充も行う（docs/spec.md ルール解釈メモ）", () => {
-    const state = buildState([{ stock: [coin(1)], pending: faceDown([coin(2)]) }, {}, {}, {}], {
+    const state = buildState([{ stock: [coin(1)], pending: faceDown([coin(2)]) }, {}, {}], {
       drawPile: [coin(3), coin(3)],
     });
 
@@ -89,7 +87,7 @@ describe("resolveAvalanche（なだれ）", () => {
   });
 
   it("滞留が全レーン空なら何も起きない", () => {
-    const state = buildState([{}, {}, {}, {}]);
+    const state = buildState([{}, {}, {}]);
 
     const result = resolveAvalanche(state);
 
@@ -98,7 +96,7 @@ describe("resolveAvalanche（なだれ）", () => {
   });
 
   it("元の状態を変更しない", () => {
-    const state = buildState([{ stock: [coin(1)], pending: faceDown([coin(2)]) }, {}, {}, {}]);
+    const state = buildState([{ stock: [coin(1)], pending: faceDown([coin(2)]) }, {}, {}]);
 
     resolveAvalanche(state);
 
@@ -109,7 +107,7 @@ describe("resolveAvalanche（なだれ）", () => {
 
 describe("resolveOpenLane（横穴開放）", () => {
   it("指定レーンの滞留をすべて表向きにする（docs/spec.md §6）", () => {
-    const state = buildState([{ pending: faceDown([coin(1), coin(2), coin(3)]) }, {}, {}, {}]);
+    const state = buildState([{ pending: faceDown([coin(1), coin(2), coin(3)]) }, {}, {}]);
 
     const result = resolveOpenLane(state, 0, 1);
 
@@ -117,7 +115,7 @@ describe("resolveOpenLane（横穴開放）", () => {
   });
 
   it("選んだ1枚を獲得する", () => {
-    const state = buildState([{ pending: faceDown([coin(1), coin(2), coin(3)]) }, {}, {}, {}]);
+    const state = buildState([{ pending: faceDown([coin(1), coin(2), coin(3)]) }, {}, {}]);
 
     const result = resolveOpenLane(state, 0, 1);
 
@@ -126,7 +124,7 @@ describe("resolveOpenLane（横穴開放）", () => {
   });
 
   it("残りは表向きのまま滞留する", () => {
-    const state = buildState([{ pending: faceDown([coin(1), coin(2), coin(3)]) }, {}, {}, {}]);
+    const state = buildState([{ pending: faceDown([coin(1), coin(2), coin(3)]) }, {}, {}]);
 
     const result = resolveOpenLane(state, 0, 1);
 
@@ -134,13 +132,13 @@ describe("resolveOpenLane（横穴開放）", () => {
   });
 
   it("滞留枚数が減る", () => {
-    const state = buildState([{ pending: faceDown([coin(1), coin(2)]) }, {}, {}, {}]);
+    const state = buildState([{ pending: faceDown([coin(1), coin(2)]) }, {}, {}]);
 
     expect(resolveOpenLane(state, 0, 0).state.lanes[0]?.pending).toHaveLength(1);
   });
 
   it("滞留が空なら何も獲得しないが例外にもならない", () => {
-    const state = buildState([{ pending: [] }, {}, {}, {}]);
+    const state = buildState([{ pending: [] }, {}, {}]);
 
     const result = resolveOpenLane(state, 0, 0);
 
@@ -162,7 +160,7 @@ describe("resolveOpenLane（横穴開放）", () => {
   });
 
   it("元の状態を変更しない", () => {
-    const state = buildState([{ pending: faceDown([coin(1), coin(2)]) }, {}, {}, {}]);
+    const state = buildState([{ pending: faceDown([coin(1), coin(2)]) }, {}, {}]);
 
     resolveOpenLane(state, 0, 0);
 
@@ -170,11 +168,11 @@ describe("resolveOpenLane（横穴開放）", () => {
   });
 
   it("存在しないレーンなら例外を投げる", () => {
-    expect(() => resolveOpenLane(buildState([{}, {}, {}, {}]), 9, 0)).toThrow(RangeError);
+    expect(() => resolveOpenLane(buildState([{}, {}, {}]), 9, 0)).toThrow(RangeError);
   });
 
   it("滞留の範囲外を選んだら例外を投げる", () => {
-    const state = buildState([{ pending: faceDown([coin(1)]) }, {}, {}, {}]);
+    const state = buildState([{ pending: faceDown([coin(1)]) }, {}, {}]);
 
     expect(() => resolveOpenLane(state, 0, 5)).toThrow(RangeError);
     expect(() => resolveOpenLane(state, 0, -1)).toThrow(RangeError);
@@ -183,25 +181,25 @@ describe("resolveOpenLane（横穴開放）", () => {
 
 describe("resolveExtraSlot（投入口増設）", () => {
   it("指定レーンに増設マーカーを置く（docs/spec.md §6）", () => {
-    const state = buildState([{}, {}, {}, {}]);
+    const state = buildState([{}, {}, {}]);
 
     expect(resolveExtraSlot(state, 1).lanes[1]?.hasExtraSlot).toBe(true);
   });
 
   it("他のレーンにはマーカーを置かない", () => {
-    const next = resolveExtraSlot(buildState([{}, {}, {}, {}]), 1);
+    const next = resolveExtraSlot(buildState([{}, {}, {}]), 1);
 
     expect(next.lanes[0]?.hasExtraSlot).toBe(false);
   });
 
   it("すでにマーカーがあるレーンでも壊れない", () => {
-    const state = buildState([{ hasExtraSlot: true }, {}, {}, {}]);
+    const state = buildState([{ hasExtraSlot: true }, {}, {}]);
 
     expect(resolveExtraSlot(state, 0).lanes[0]?.hasExtraSlot).toBe(true);
   });
 
   it("元の状態を変更しない", () => {
-    const state = buildState([{}, {}, {}, {}]);
+    const state = buildState([{}, {}, {}]);
 
     resolveExtraSlot(state, 0);
 
@@ -209,19 +207,19 @@ describe("resolveExtraSlot（投入口増設）", () => {
   });
 
   it("存在しないレーンなら例外を投げる", () => {
-    expect(() => resolveExtraSlot(buildState([{}, {}, {}, {}]), 9)).toThrow(RangeError);
+    expect(() => resolveExtraSlot(buildState([{}, {}, {}]), 9)).toThrow(RangeError);
   });
 });
 
 describe("resolveLottery（抽選抽選）", () => {
   it("ジャックポットカウンターを2つ進める（docs/spec.md §6）", () => {
-    const state = buildState([{}, {}, {}, {}], { jackpotCounter: 1 });
+    const state = buildState([{}, {}, {}], { jackpotCounter: 1 });
 
     expect(resolveLottery(state, scriptedRng([1])).state.jackpotCounter).toBe(3);
   });
 
   it("カウンターは閾値で頭打ちになる", () => {
-    const state = buildState([{}, {}, {}, {}], { jackpotCounter: 4 });
+    const state = buildState([{}, {}, {}], { jackpotCounter: 4 });
 
     const result = resolveLottery(state, scriptedRng([1]));
 
@@ -230,7 +228,7 @@ describe("resolveLottery（抽選抽選）", () => {
 
   it("即座に JP判定を1回行う（docs/spec.md §6）", () => {
     const pool: Card[] = [coin(3), coin(2)];
-    const state = buildState([{}, {}, {}, {}], { jackpotCounter: 3, jackpotPool: pool });
+    const state = buildState([{}, {}, {}], { jackpotCounter: 3, jackpotPool: pool });
 
     const result = resolveLottery(state, scriptedRng([6]));
 
@@ -240,7 +238,7 @@ describe("resolveLottery（抽選抽選）", () => {
   });
 
   it("外れてもカウンターは戻らない（docs/spec.md §6）", () => {
-    const state = buildState([{}, {}, {}, {}], { jackpotCounter: 1 });
+    const state = buildState([{}, {}, {}], { jackpotCounter: 1 });
 
     const result = resolveLottery(state, scriptedRng([2]));
 
@@ -249,7 +247,7 @@ describe("resolveLottery（抽選抽選）", () => {
   });
 
   it("カウンターが閾値未満でも JP判定を行う（docs/spec.md §6）", () => {
-    const state = buildState([{}, {}, {}, {}], { jackpotCounter: 0, jackpotPool: [coin(1)] });
+    const state = buildState([{}, {}, {}], { jackpotCounter: 0, jackpotPool: [coin(1)] });
 
     const result = resolveLottery(state, scriptedRng([6]));
 
@@ -259,7 +257,7 @@ describe("resolveLottery（抽選抽選）", () => {
   });
 
   it("元の状態を変更しない", () => {
-    const state = buildState([{}, {}, {}, {}], { jackpotCounter: 1 });
+    const state = buildState([{}, {}, {}], { jackpotCounter: 1 });
 
     resolveLottery(state, scriptedRng([1]));
 

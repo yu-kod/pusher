@@ -68,12 +68,13 @@ describe("createDeck", () => {
 describe("DEFAULT_DECK_CONFIG", () => {
   const deck = createDeck(DEFAULT_DECK_CONFIG);
 
-  it("総枚数が 200 枚になる", () => {
-    expect(deck).toHaveLength(200);
+  it("総枚数が 90 枚になる（docs/spec.md §1）", () => {
+    expect(deck).toHaveLength(90);
   });
 
-  it("イベントカードがデッキ全体の 15% を占める（docs/spec.md §1）", () => {
-    expect(deck.filter(isEventCard)).toHaveLength(30);
+  it("イベントカードがデッキ全体の約 15% を占める（docs/spec.md §1）", () => {
+    expect(deck.filter(isEventCard)).toHaveLength(14);
+    expect(deck.filter(isEventCard).length / deck.length).toBeCloseTo(0.15, 1);
   });
 
   it("イベント4種をすべて含む", () => {
@@ -86,17 +87,18 @@ describe("DEFAULT_DECK_CONFIG", () => {
 
   it("コインカードの構成比が 40 / 35 / 25 に近い（docs/spec.md §1）", () => {
     const coins = deck.filter(isCoinCard);
-    expect(coins).toHaveLength(170);
+    expect(coins).toHaveLength(76);
 
     const ratio = (n: 1 | 2 | 3) => coins.filter((c) => c.coins === n).length / coins.length;
-    expect(ratio(1)).toBeCloseTo(0.4, 2);
-    expect(ratio(2)).toBeCloseTo(0.35, 2);
-    expect(ratio(3)).toBeCloseTo(0.25, 2);
+    expect(ratio(1)).toBeCloseTo(0.4, 1);
+    expect(ratio(2)).toBeCloseTo(0.35, 1);
+    expect(ratio(3)).toBeCloseTo(0.25, 1);
   });
 
-  it("セットアップとラウンド終了処理で使う枚数を賄える（docs/spec.md ルール解釈メモ）", () => {
-    // セットアップ 40 枚 + ラウンド終了処理 8 枚 × 12 ラウンド = 136 枚
-    expect(deck.length).toBeGreaterThan(40 + 8 * 12);
+  it("場に出る枚数の2倍以上ある（docs/spec.md §1）", () => {
+    // レーン 3×5 + 滞留 3×3 + 手札 4×5 = 44 枚が場に出る。
+    // 落下カードは山札へ戻る閉じた循環なので、その2倍あれば山札は枯れない
+    expect(deck.length).toBeGreaterThanOrEqual(44 * 2);
   });
 });
 

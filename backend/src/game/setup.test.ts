@@ -14,8 +14,8 @@ const NAMES_4 = [...NAMES_3, "Dave"];
 describe("setupGame", () => {
   describe("レーン", () => {
     it("設定した本数のレーンを作る", () => {
-      expect(setupGame(NAMES_4, createRng(1), buildConfig()).lanes).toHaveLength(4);
-      expect(setupGame(NAMES_4, createRng(1), buildConfig({ laneCount: 3 })).lanes).toHaveLength(3);
+      expect(setupGame(NAMES_4, createRng(1), buildConfig()).lanes).toHaveLength(3);
+      expect(setupGame(NAMES_4, createRng(1), buildConfig({ laneCount: 4 })).lanes).toHaveLength(4);
     });
 
     it("各レーンの奥に 5 枚ずつ配る（docs/spec.md §2）", () => {
@@ -101,7 +101,7 @@ describe("setupGame", () => {
       const config = buildConfig();
       const state = setupGame(NAMES_4, createRng(1), config);
 
-      const dealt = 4 * config.initialLaneCards + 4 * config.initialHandSize;
+      const dealt = config.laneCount * config.initialLaneCards + 4 * config.initialHandSize;
       expect(state.drawPile).toHaveLength(createDeck(config.deck).length - dealt);
     });
 
@@ -179,7 +179,7 @@ describe("setupGame", () => {
 
 describe("DEFAULT_BALANCE", () => {
   it("設計書どおりの既定値になっている（docs/spec.md §1 §2 §3）", () => {
-    expect(DEFAULT_BALANCE.laneCount).toBe(4);
+    expect(DEFAULT_BALANCE.laneCount).toBe(3);
     expect(DEFAULT_BALANCE.initialLaneCards).toBe(5);
     expect(DEFAULT_BALANCE.initialHandSize).toBe(5);
     expect(DEFAULT_BALANCE.handLimit).toBeNull();
