@@ -107,7 +107,9 @@ GitHub の Secrets に登録するのはロールの ARN（`AWS_ROLE_ARN`）だ�
 初回のみブートストラップ（tfstate バケット・ロックテーブル・OIDC ロールの作成）が必要だが、
 **AWS CloudShell だけで完結するため PC は要らない**。手順は [docs/deploy.md](docs/deploy.md) を参照。
 
-カスタムドメインは任意。未設定なら CloudFront の既定ドメインで公開する。
+公開先は **https://pusher-table.yu-web.site**。`yu-web.site` の Route 53 ホストゾーンに
+サブドメインをぶら下げている。`infra/variables.tf` の `domain_name` を空文字にすれば
+CloudFront の既定ドメインでも公開できる。
 
 ## CI
 
