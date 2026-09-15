@@ -1,0 +1,131 @@
+/**
+ * クライアントへ返す状態（docs/spec.md §8）。
+ *
+ * 「レーンの中身と滞留エリアが裏向きで、枚数だけが公開情報」という情報設計が
+ * このゲームの核になっている。サーバーが持つ `GameState` をそのまま返すと、
+ * めくる瞬間の快感がまるごと失われる。
+ *
+ * ## GameState とは別の型にする
+ *
+ * マスクし忘れを型で防ぐため、クライアントへ渡せるのはこの `GameView` だけにする。
+ * `GameState` を受け取る API は作らない。
+ *
+ * ## 誰向けかを型に含める
+ *
+ * 自分の手札は見えるが他人の手札は枚数しか見えないため、マスク結果はプレイヤーごとに
+ * 異なる。`viewerId` を持たせて、どのプレイヤー向けのビューかを取り違えないようにする。
+ */
+import type { Balance } from "./balance.js";
+import type { Card } from "./deck.js";
+import type { GamePhase, GameState, PlayerId } from "./setup.js";
+
+/**
+ * 滞留エリアのカード1枚。
+ *
+ * 裏向きのものは中身を持たない。「横穴開放」（§6）で表向きになったものだけ
+ * カードを返す。判別可能なユニオンにして、裏向きなのに中身がある状態を
+ * 型で表現できないようにしてある。
+ */
+export type PendingCardView = { faceUp: true; card: Card } | { faceUp: false };
+
+export type LaneView = {
+  /** 奥の山は枚数のみ。中身は誰にも見えない */
+  stockCount: number;
+  pending: PendingCardView[];
+  hasExtraSlot: boolean;
+};
+
+/** 手札。自分のものだけ中身が見える */
+export type HandView = { owner: true; cards: Card[] } | { owner: false; count: number };
+
+export type PlayerView = {
+  id: PlayerId;
+  name: string;
+  points: number;
+  hand: HandView;
+};
+
+/**
+ * 表示に必要な調整値だけを抜き出したもの。
+ *
+ * `Balance` をそのまま返してはいけない。`pushCount` は関数なので JSON 化できず、
+ * デッキ構成をクライアントへ渡す理由もない。
+ */
+export type RulesView = {
+  laneCount: number;
+  maxLanesPerRound: number;
+  maxRounds: number;
+  jackpotThreshold: number;
+};
+
+export type GameView = {
+  /** このビューを見るプレイヤー。卓にいない id なら観戦者として扱う */
+  viewerId: PlayerId;
+  rules: RulesView;
+  lanes: LaneView[];
+  players: PlayerView[];
+  /** 山札は枚数のみ */
+  drawPileCount: number;
+  /** 捨て札も枚数のみ。残りのイベント枚数を数えられないようにする */
+  discardPileCount: number;
+  pendingPoints: number;
+  jackpotPoints: number;
+  jackpotCounter: number;
+  currentPlayerIndex: number;
+  startPlayerIndex: number;
+  insertionRoundsThisTurn: number;
+  round: number;
+  lastSideHolePlayerId: PlayerId | null;
+  phase: GamePhase;
+};
+
+function rulesOf(config: Balance): RulesView {
+  return {
+    laneCount: config.laneCount,
+    maxLanesPerRound: config.maxLanesPerRound,
+    maxRounds: config.maxRounds,
+    jackpotThreshold: config.jackpotThreshold,
+  };
+}
+
+/**
+ * 指定したプレイヤー向けにマスクした状態を返す（docs/spec.md §8）。
+ *
+ * `viewerId` が卓にいないプレイヤーなら、どの手札も枚数しか見えない（観戦者）。
+ */
+export function viewFor(state: GameState, viewerId: PlayerId): GameView {
+  return {
+    viewerId,
+    rules: rulesOf(state.config),
+
+    lanes: state.lanes.map((lane) => ({
+      stockCount: lane.stock.length,
+      pending: lane.pending.map((p): PendingCardView =>
+        p.faceUp ? { faceUp: true, card: p.card } : { faceUp: false }
+      ),
+      hasExtraSlot: lane.hasExtraSlot,
+    })),
+
+    players: state.players.map((player) => ({
+      id: player.id,
+      name: player.name,
+      points: player.points,
+      hand:
+        player.id === viewerId
+          ? { owner: true, cards: player.hand }
+          : { owner: false, count: player.hand.length },
+    })),
+
+    drawPileCount: state.drawPile.length,
+    discardPileCount: state.discardPile.length,
+    pendingPoints: state.pendingPoints,
+    jackpotPoints: state.jackpotPoints,
+    jackpotCounter: state.jackpotCounter,
+    currentPlayerIndex: state.currentPlayerIndex,
+    startPlayerIndex: state.startPlayerIndex,
+    insertionRoundsThisTurn: state.insertionRoundsThisTurn,
+    round: state.round,
+    lastSideHolePlayerId: state.lastSideHolePlayerId,
+    phase: state.phase,
+  };
+}
