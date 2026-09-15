@@ -11,10 +11,13 @@ export type PlayerId = string;
 export type Player = {
   id: PlayerId;
   name: string;
-  /** 手札。中身は本人のみが見える */
+  /**
+   * 手札。中身は本人のみが見える。
+   *
+   * 押し出しで獲得したカードもここへ加える。領域は手札ひとつだけで、
+   * 得点は手札のコイン合計になる（docs/spec.md のルール解釈メモ）。
+   */
   hand: Card[];
-  /** 獲得済みのカード。表向きなので全員に見える（＝得点かつ次の弾薬） */
-  captured: Card[];
 };
 
 export type Lane = {
@@ -118,7 +121,6 @@ export function setupGame(playerNames: readonly string[], rng: Rng, config: Game
     id: `p${index + 1}`,
     name,
     hand: take(config.initialHandSize),
-    captured: [],
   }));
 
   return {

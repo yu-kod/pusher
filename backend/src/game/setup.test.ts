@@ -67,14 +67,6 @@ describe("setupGame", () => {
         expect(player.hand).toHaveLength(5);
       }
     });
-
-    it("獲得済みカードは空で始まる", () => {
-      const state = setupGame(NAMES_4, createRng(1), buildConfig());
-
-      for (const player of state.players) {
-        expect(player.captured).toEqual([]);
-      }
-    });
   });
 
   describe("場", () => {
@@ -119,7 +111,7 @@ describe("setupGame", () => {
       const all = [
         ...state.drawPile,
         ...state.lanes.flatMap((l) => [...l.stock, ...l.pending]),
-        ...state.players.flatMap((p) => [...p.hand, ...p.captured]),
+        ...state.players.flatMap((p) => p.hand),
         ...state.jackpotPool,
       ];
 
