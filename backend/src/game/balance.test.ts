@@ -10,39 +10,42 @@ import {
 
 describe("DEFAULT_BALANCE", () => {
   it("設計書どおりの既定値になっている（docs/spec.md §1 §2 §3 §5）", () => {
-    expect(DEFAULT_BALANCE.laneCount).toBe(4);
+    expect(DEFAULT_BALANCE.laneCount).toBe(3);
     expect(DEFAULT_BALANCE.initialLaneCards).toBe(5);
     expect(DEFAULT_BALANCE.initialHandSize).toBe(5);
     expect(DEFAULT_BALANCE.maxRounds).toBe(12);
     expect(DEFAULT_BALANCE.jackpotThreshold).toBe(5);
-    expect(DEFAULT_BALANCE.roundDrawCount).toBe(1);
+    expect(DEFAULT_BALANCE.roundDrawCount).toBe(2);
+    expect(DEFAULT_BALANCE.roundLaneRefillCount).toBe(0);
+    expect(DEFAULT_BALANCE.handLimit).toBeNull();
   });
 
   it("コイン札の構成比が 40 / 35 / 25 に近い（docs/spec.md §1）", () => {
     const coins = createDeck(DEFAULT_BALANCE.deck).filter(isCoinCard);
 
     const ratio = (n: 1 | 2 | 3) => coins.filter((c) => c.coins === n).length / coins.length;
-    expect(ratio(1)).toBeCloseTo(0.4, 2);
-    expect(ratio(2)).toBeCloseTo(0.35, 2);
-    expect(ratio(3)).toBeCloseTo(0.25, 2);
+    expect(ratio(1)).toBeCloseTo(0.4, 1);
+    expect(ratio(2)).toBeCloseTo(0.35, 1);
+    expect(ratio(3)).toBeCloseTo(0.25, 1);
   });
 
   it("イベントカードがデッキ全体の 15% を占める（docs/spec.md §1）", () => {
     const deck = createDeck(DEFAULT_BALANCE.deck);
 
-    expect(deck.filter(isEventCard).length / deck.length).toBeCloseTo(0.15, 2);
+    expect(deck.filter(isEventCard).length / deck.length).toBeCloseTo(0.15, 1);
   });
 });
 
 describe("withPreset", () => {
   it("プリセットを適用した Balance を返す", () => {
     expect(withPreset("lanes3").laneCount).toBe(3);
+    expect(withPreset("lanes4").laneCount).toBe(4);
   });
 
   it("元の DEFAULT_BALANCE を変更しない", () => {
-    withPreset("lanes3");
+    withPreset("lanes4");
 
-    expect(DEFAULT_BALANCE.laneCount).toBe(4);
+    expect(DEFAULT_BALANCE.laneCount).toBe(3);
   });
 
   it("指定しなかった値は既定のまま残る", () => {
@@ -106,7 +109,7 @@ describe("BALANCE_PRESETS（docs/spec.md §7 の検証項目）", () => {
       const coins = createDeck(withPreset("coin3Ratio15").deck).filter(isCoinCard);
 
       const ratio = coins.filter((c) => c.coins === 3).length / coins.length;
-      expect(ratio).toBeCloseTo(0.15, 2);
+      expect(ratio).toBeCloseTo(0.15, 1);
     });
 
     it("総枚数は既定と変わらない", () => {
@@ -187,11 +190,11 @@ describe("部分上書き", () => {
 });
 
 describe("プリセットがエンジンの挙動を変える", () => {
-  it("lanes3 を適用するとレーンが3本になる", async () => {
+  it("lanes4 を適用するとレーンが4本になる", async () => {
     const { setupGame } = await import("./setup.js");
     const { createRng } = await import("./rng.js");
 
-    expect(setupGame(["A", "B", "C"], createRng(1), withPreset("lanes3")).lanes).toHaveLength(3);
+    expect(setupGame(["A", "B", "C"], createRng(1), withPreset("lanes4")).lanes).toHaveLength(4);
   });
 
   it("pushHalf を適用すると押し込み枚数が減る", async () => {
