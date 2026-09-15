@@ -23,6 +23,17 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # 初回セットアップが済んでいないとき、OIDC の分かりにくいエラーではなく
+      # 何をすればよいかを出す
+      - name: Check setup
+        env:
+          AWS_ROLE_ARN: ${{ secrets.AWS_ROLE_ARN }}
+        run: |
+          if [ -z "$AWS_ROLE_ARN" ]; then
+            echo "::error::Secrets に AWS_ROLE_ARN が未設定です。docs/deploy.md の「初回だけ必要な作業」に従って、AWS CloudShell で infra/bootstrap を apply し、出力された github_actions_role_arn を登録してください。"
+            exit 1
+          fi
+
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
