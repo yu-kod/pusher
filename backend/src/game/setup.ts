@@ -4,7 +4,7 @@
  * 状態は不変に扱う。各関数は引数の状態を変更せず、新しい状態を返す。
  */
 import { type Balance } from "./balance.js";
-import { createDeck, type Card } from "./deck.js";
+import { createDeck, isCoinCard, type Card } from "./deck.js";
 import type { Rng } from "./rng.js";
 
 export type PlayerId = string;
@@ -93,9 +93,13 @@ const MAX_PLAYERS = 4;
  *
  * 1. メインデッキをシャッフルする
  * 2. 各レーンの奥に initialLaneCards 枚、滞留エリアに initialPendingCards 枚ずつ裏向きで配置する
- * 3. 各プレイヤーに initialHandSize 枚を配る
+ * 3. 各プレイヤーに initialHandSize 枚を配る。**イベントカードは引き直す**
  * 4. ジャックポットカウンターを 0 に置く
  * 5. 残りを山札とする
+ *
+ * 手札にイベントカードが入ると、コイン数がないので投入できず死に札になる
+ * （docs/spec.md のルール解釈メモ）。ラウンド終了時のドローは効果を即座に解決して
+ * 捨て札にするが、セットアップ時点では解決する盤面がまだないので引き直す。
  */
 export function setupGame(playerNames: readonly string[], rng: Rng, config: Balance): GameState {
   if (playerNames.length < MIN_PLAYERS || playerNames.length > MAX_PLAYERS) {
@@ -119,6 +123,28 @@ export function setupGame(playerNames: readonly string[], rng: Rng, config: Bala
   let next = 0;
   const take = (count: number): Card[] => deck.slice(next, (next += count));
 
+  /**
+   * 手札用にコインカードだけを配る。イベントカードは飛ばす（引き直す）。
+   *
+   * 飛ばしたカードは配布済みの位置に置き去りにせず、あとで山札へ戻す。
+   */
+  const skipped: Card[] = [];
+  const takeCoins = (count: number): Card[] => {
+    const taken: Card[] = [];
+    while (taken.length < count) {
+      const [card] = take(1);
+      if (card === undefined) {
+        throw new RangeError(`手札に配るコインカードが足りない: あと ${count - taken.length} 枚`);
+      }
+      if (isCoinCard(card)) {
+        taken.push(card);
+      } else {
+        skipped.push(card);
+      }
+    }
+    return taken;
+  };
+
   const lanes: Lane[] = Array.from({ length: config.laneCount }, () => ({
     stock: take(config.initialLaneCards),
     // 滞留も裏向きで始める。空から始めると先手が一方的に不利になる（§2 / #54）
@@ -129,7 +155,7 @@ export function setupGame(playerNames: readonly string[], rng: Rng, config: Bala
   const players: Player[] = playerNames.map((name, index) => ({
     id: `p${index + 1}`,
     name,
-    hand: take(config.initialHandSize),
+    hand: takeCoins(config.initialHandSize),
     points: 0,
   }));
 
@@ -137,7 +163,8 @@ export function setupGame(playerNames: readonly string[], rng: Rng, config: Bala
     config,
     lanes,
     players,
-    drawPile: deck.slice(next),
+    // 引き直したイベントカードは山札の先頭へ戻す
+    drawPile: [...skipped, ...deck.slice(next)],
     discardPile: [],
     pendingPoints: 0,
     insertionRoundsThisTurn: 0,
