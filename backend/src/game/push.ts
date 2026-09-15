@@ -11,7 +11,8 @@
  * - `lane.stock` — 添字 0 が末端（落下口）側、末尾が奥側。落下は先頭から、押し込みと補充は末尾へ
  * - `lane.pending` — 添字 0 が奥側（レーンに近い側）。先に入ったカードから押し込まれる
  */
-import type { Card } from "./deck.js";
+import { isCoinCard, isEventCard, type Card } from "./deck.js";
+import { totalPoints } from "./score.js";
 import type { GameState } from "./setup.js";
 
 export type PushResult = {
@@ -71,20 +72,40 @@ export function resolvePush(
 }
 
 /**
- * 落ちたカードを手番プレイヤーの手札に加える（docs/spec.md §4-2）。
+ * 落ちたカードを未確定得点に加え、カードを場から片付ける（docs/spec.md §4-2 §6）。
  *
- * 獲得したカードは手札に入り、そのまま次の投入に使える
- * （領域は手札ひとつだけ。docs/spec.md のルール解釈メモ）。
+ * - コインカード → 印字されたコイン数を未確定得点へ。カードは**山札の底へ戻す**
+ * - イベントカード → 0点。**捨て札**にする（山札へは戻らない）
+ *
+ * 得点はまだ確定しない。手番を「やめる」まで未確定のまま積み上がり、
+ * 横穴（バースト）が出たらジャックポットへ移る（§3 §5）。
+ *
+ * 山札へ戻す位置を底にしている理由は docs/spec.md のルール解釈メモを参照。
  */
-export function addToHand(state: GameState, cards: readonly Card[]): GameState {
+export function collectFallenCards(state: GameState, cards: readonly Card[]): GameState {
+  const coins = cards.filter(isCoinCard);
+  const events = cards.filter(isEventCard);
+
+  return {
+    ...state,
+    pendingPoints: state.pendingPoints + totalPoints(coins),
+    drawPile: [...state.drawPile, ...coins],
+    discardPile: [...state.discardPile, ...events],
+  };
+}
+
+/**
+ * 未確定得点を手番プレイヤーの得点として確定する（docs/spec.md §3「やめる」）。
+ */
+export function bankPendingPoints(state: GameState): GameState {
   const player = state.players[state.currentPlayerIndex];
   if (player === undefined) {
     throw new RangeError(`手番プレイヤーがいない: ${state.currentPlayerIndex}`);
   }
 
   const players = state.players.map((p, index) =>
-    index === state.currentPlayerIndex ? { ...p, hand: [...p.hand, ...cards] } : p
+    index === state.currentPlayerIndex ? { ...p, points: p.points + state.pendingPoints } : p
   );
 
-  return { ...state, players };
+  return { ...state, players, pendingPoints: 0 };
 }

@@ -15,7 +15,7 @@
  */
 import type { Card } from "./deck.js";
 import { rollJackpot } from "./jackpot.js";
-import { addToHand, resolvePush } from "./push.js";
+import { collectFallenCards, resolvePush } from "./push.js";
 import type { Rng } from "./rng.js";
 import type { GameState } from "./setup.js";
 
@@ -51,15 +51,15 @@ export function resolveAvalanche(state: GameState): AvalancheResult {
 
 export type OpenLaneResult = {
   state: GameState;
-  /** 獲得したカード。滞留が空だった場合は null */
+  /** 得点にしたカード。滞留が空だった場合は null */
   takenCard: Card | null;
 };
 
 /**
  * 横穴開放（docs/spec.md §6）。
  *
- * 指定した1レーンの滞留をすべて表向きにする。引いた人はその中から1枚を獲得し、
- * 残りは**表向きのまま**滞留する。そのレーンの中身が全員に公開された状態が続く。
+ * 指定した1レーンの滞留をすべて表向きにする。引いた人はその中から1枚を選んで点数にし、
+ * カードは山札へ戻す。残りは**表向きのまま**滞留し、そのレーンの中身が全員に公開された状態が続く。
  */
 export function resolveOpenLane(
   state: GameState,
@@ -89,8 +89,9 @@ export function resolveOpenLane(
     index === laneIndex ? { ...l, pending: remaining } : l
   );
 
+  // 選んだ1枚は点数になり、カードは山札へ戻る（§6 / §4-2 と同じ扱い）
   return {
-    state: addToHand({ ...state, lanes }, [picked.card]),
+    state: collectFallenCards({ ...state, lanes }, [picked.card]),
     takenCard: picked.card,
   };
 }
@@ -118,7 +119,7 @@ export type LotteryResult = {
   state: GameState;
   jackpotRoll: number;
   jackpotWon: boolean;
-  wonCards: Card[];
+  wonPoints: number;
 };
 
 /**
@@ -145,6 +146,6 @@ export function resolveLottery(state: GameState, rng: Pick<Rng, "rollD6">): Lott
     state: result.state,
     jackpotRoll: result.roll,
     jackpotWon: result.won,
-    wonCards: result.wonCards,
+    wonPoints: result.wonPoints,
   };
 }

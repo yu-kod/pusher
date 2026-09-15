@@ -4,7 +4,7 @@ import { createRng } from "./rng.js";
 import { DEFAULT_BALANCE } from "./balance.js";
 import { setupGame, type GameState } from "./setup.js";
 import { coin, faceDown } from "../test-utils/cards.js";
-import { addToHand, resolvePush } from "./push.js";
+import { bankPendingPoints, collectFallenCards, resolvePush } from "./push.js";
 
 /** レーン0 の中身と滞留、山札を指定した状態を作る */
 function buildState(options: { stock?: Card[]; pending?: Card[]; drawPile?: Card[] }): GameState {
@@ -201,7 +201,7 @@ describe("resolvePush", () => {
         s.drawPile.length +
         s.lanes.reduce((n, l) => n + l.stock.length + l.pending.length, 0) +
         s.players.reduce((n, p) => n + p.hand.length, 0) +
-        s.jackpotPool.length +
+        s.discardPile.length +
         extra.length;
 
       expect(countAll(result.state, result.fallenCards)).toBe(countAll(state));
@@ -228,50 +228,105 @@ describe("resolvePush", () => {
   });
 });
 
-describe("addToHand", () => {
-  it("落ちたカードを手番プレイヤーの手札に加える（docs/spec.md §4-2）", () => {
+describe("collectFallenCards", () => {
+  it("落ちたコインカードの点数を未確定得点に加える（docs/spec.md §4-2）", () => {
     const state = buildState({});
 
-    const next = addToHand(state, [coin(2), coin(3)]);
-
-    expect(next.players[0]?.hand).toEqual([coin(2), coin(3)]);
+    expect(collectFallenCards(state, [coin(2), coin(3)]).pendingPoints).toBe(5);
   });
 
-  it("既存の手札の後ろに加える", () => {
-    const base = buildState({});
-    const state = {
-      ...base,
-      players: base.players.map((p, i) => (i === 0 ? { ...p, hand: [coin(1)] } : p)),
-    };
+  it("落ちたコインカードを山札の底へ戻す（docs/spec.md ルール解釈メモ）", () => {
+    const state = buildState({ drawPile: [coin(1)] });
 
-    expect(addToHand(state, [coin(2)]).players[0]?.hand).toEqual([coin(1), coin(2)]);
+    expect(collectFallenCards(state, [coin(2), coin(3)]).drawPile).toEqual([
+      coin(1),
+      coin(2),
+      coin(3),
+    ]);
   });
 
-  it("手番プレイヤー以外の手札は変わらない", () => {
+  it("イベントカードは 0 点で捨て札へ入り、山札へ戻らない（docs/spec.md §6）", () => {
+    const state = buildState({ drawPile: [] });
+    const event = { kind: "event", event: "avalanche" } as const;
+
+    const next = collectFallenCards(state, [coin(2), event]);
+
+    expect(next.pendingPoints).toBe(2);
+    expect(next.drawPile).toEqual([coin(2)]);
+    expect(next.discardPile).toEqual([event]);
+  });
+
+  it("既存の未確定得点に積み増す", () => {
+    const state = { ...buildState({}), pendingPoints: 4 };
+
+    expect(collectFallenCards(state, [coin(3)]).pendingPoints).toBe(7);
+  });
+
+  it("手札は増えない（v0.2 で獲得は点数になった）", () => {
     const state = buildState({});
 
-    const next = addToHand(state, [coin(2)]);
-
-    expect(next.players[1]?.hand).toEqual([]);
-  });
-
-  it("元の状態を変更しない", () => {
-    const state = buildState({});
-
-    addToHand(state, [coin(2)]);
-
-    expect(state.players[0]?.hand).toEqual([]);
+    expect(collectFallenCards(state, [coin(2)]).players[0]?.hand).toEqual([]);
   });
 
   it("空配列を渡しても壊れない", () => {
     const state = buildState({});
 
-    expect(addToHand(state, []).players[0]?.hand).toEqual([]);
+    expect(collectFallenCards(state, []).pendingPoints).toBe(0);
+  });
+
+  it("元の状態を変更しない", () => {
+    const state = buildState({});
+
+    collectFallenCards(state, [coin(2)]);
+
+    expect(state.pendingPoints).toBe(0);
+    expect(state.drawPile).toEqual([]);
+  });
+});
+
+describe("bankPendingPoints", () => {
+  it("未確定得点を手番プレイヤーの得点に加える（docs/spec.md §3）", () => {
+    const state = { ...buildState({}), pendingPoints: 7 };
+
+    const next = bankPendingPoints(state);
+
+    expect(next.players[0]?.points).toBe(7);
+    expect(next.pendingPoints).toBe(0);
+  });
+
+  it("既存の得点に積み増す", () => {
+    const base = buildState({});
+    const state = {
+      ...base,
+      pendingPoints: 4,
+      players: base.players.map((p, i) => (i === 0 ? { ...p, points: 10 } : p)),
+    };
+
+    expect(bankPendingPoints(state).players[0]?.points).toBe(14);
+  });
+
+  it("手番プレイヤー以外の得点は変わらない", () => {
+    const state = { ...buildState({}), pendingPoints: 7 };
+
+    expect(bankPendingPoints(state).players[1]?.points).toBe(0);
+  });
+
+  it("未確定得点が 0 でも壊れない", () => {
+    expect(bankPendingPoints(buildState({})).players[0]?.points).toBe(0);
+  });
+
+  it("元の状態を変更しない", () => {
+    const state = { ...buildState({}), pendingPoints: 7 };
+
+    bankPendingPoints(state);
+
+    expect(state.pendingPoints).toBe(7);
+    expect(state.players[0]?.points).toBe(0);
   });
 
   it("手番プレイヤーの添字が範囲外なら例外を投げる", () => {
     const state = { ...buildState({}), currentPlayerIndex: 99 };
 
-    expect(() => addToHand(state, [coin(2)])).toThrow(RangeError);
+    expect(() => bankPendingPoints(state)).toThrow(RangeError);
   });
 });

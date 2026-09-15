@@ -4,7 +4,6 @@
  * 横穴は出目6かつ目標値6以上のとき発生する（判定は turn.ts）。
  * 押し出し自体は通常どおり処理され（push.ts）、落ちたカードの行き先だけが変わる。
  */
-import type { Card } from "./deck.js";
 import type { Rng } from "./rng.js";
 import type { GameState } from "./setup.js";
 
@@ -12,16 +11,16 @@ import type { GameState } from "./setup.js";
 const JACKPOT_WIN_ROLL = 6;
 
 /**
- * 横穴を処理する（docs/spec.md §5）。
+ * 横穴（バースト）を処理する（docs/spec.md §3 §5）。
  *
- * - 落ちたカードは獲得者のものにならず、ジャックポットプールへ入る
+ * - **その手番の未確定得点がすべてジャックポットへ移る**（この投入ラウンドの落下分も含む）
  * - ジャックポットカウンターを1つ進める（上限 config.jackpotThreshold で頭打ち）
  * - 最後に横穴を出したプレイヤーを記録する（ゲーム終了時の未払い出し処理に使う）
  *
- * 押し出しそのもの（押し込み・落下・補充）は resolvePush が済ませている前提で、
- * その落下カードを受け取る。
+ * 落下カード自体は collectFallenCards が未確定得点へ加えて山札へ戻したあとなので、
+ * ここではカードを扱わない。すでに確定した得点は失われない。
  */
-export function applySideHole(state: GameState, fallenCards: readonly Card[]): GameState {
+export function applySideHole(state: GameState): GameState {
   const player = state.players[state.currentPlayerIndex];
   if (player === undefined) {
     throw new RangeError(`手番プレイヤーがいない: ${state.currentPlayerIndex}`);
@@ -29,7 +28,9 @@ export function applySideHole(state: GameState, fallenCards: readonly Card[]): G
 
   return {
     ...state,
-    jackpotPool: [...state.jackpotPool, ...fallenCards],
+    // この手番の未確定得点がすべてジャックポットへ移る（バースト）
+    jackpotPoints: state.jackpotPoints + state.pendingPoints,
+    pendingPoints: 0,
     jackpotCounter: Math.min(state.jackpotCounter + 1, state.config.jackpotThreshold),
     lastSideHolePlayerId: player.id,
   };
@@ -45,8 +46,8 @@ export type JackpotRollResult = {
   /** JP判定の出目 */
   roll: number;
   won: boolean;
-  /** 当選して獲得したプールのカード。外れたら空 */
-  wonCards: Card[];
+  /** 当選して獲得した点数。外れたら 0 */
+  wonPoints: number;
 };
 
 /**
@@ -66,24 +67,23 @@ export function rollJackpot(state: GameState, rng: Pick<Rng, "rollD6">): Jackpot
 
   const roll = rng.rollD6();
   if (roll !== JACKPOT_WIN_ROLL) {
-    return { state, roll, won: false, wonCards: [] };
+    return { state, roll, won: false, wonPoints: 0 };
   }
 
-  // 既定は全獲得。jackpotPayoutRatio を下げるとプールの一部だけを獲得し、
+  // 既定は全獲得。jackpotPayoutRatio を下げると一部だけを獲得し、
   // 残りは次のジャックポットへ持ち越す（§7 次点の検証項目）
-  const wonCount = Math.floor(state.jackpotPool.length * state.config.jackpotPayoutRatio);
-  const wonCards = state.jackpotPool.slice(0, wonCount);
-  const carriedOver = state.jackpotPool.slice(wonCount);
+  const wonPoints = Math.floor(state.jackpotPoints * state.config.jackpotPayoutRatio);
+  const carriedOver = state.jackpotPoints - wonPoints;
 
   const players = state.players.map((p, index) =>
-    index === state.currentPlayerIndex ? { ...p, hand: [...p.hand, ...wonCards] } : p
+    index === state.currentPlayerIndex ? { ...p, points: p.points + wonPoints } : p
   );
 
   return {
-    state: { ...state, players, jackpotPool: carriedOver, jackpotCounter: 0 },
+    state: { ...state, players, jackpotPoints: carriedOver, jackpotCounter: 0 },
     roll,
     won: true,
-    wonCards,
+    wonPoints,
   };
 }
 
@@ -103,8 +103,8 @@ export function settleJackpotAtGameEnd(state: GameState): GameState {
     winnerIndex === -1
       ? state.players
       : state.players.map((p, index) =>
-          index === winnerIndex ? { ...p, hand: [...p.hand, ...state.jackpotPool] } : p
+          index === winnerIndex ? { ...p, points: p.points + state.jackpotPoints } : p
         );
 
-  return { ...state, players, jackpotPool: [] };
+  return { ...state, players, jackpotPoints: 0 };
 }

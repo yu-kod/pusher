@@ -15,10 +15,11 @@ export type Player = {
   /**
    * 手札。中身は本人のみが見える。
    *
-   * 押し出しで獲得したカードもここへ加える。領域は手札ひとつだけで、
-   * 得点は手札のコイン合計になる（docs/spec.md のルール解釈メモ）。
+   * v0.2 で手札は**弾薬のみ**になった。得点にはならない（docs/spec.md §1）。
    */
   hand: Card[];
+  /** 確定した得点。手番を終えるたびに未確定得点がここへ加算される（§3） */
+  points: number;
 };
 
 /**
@@ -47,10 +48,19 @@ export type GameState = {
   config: Balance;
   lanes: Lane[];
   players: Player[];
-  /** 山札 */
+  /** 山札。落下したコインカードは底へ戻る（docs/spec.md のルール解釈メモ） */
   drawPile: Card[];
-  /** ジャックポットプール。表向き */
-  jackpotPool: Card[];
+  /** 捨て札。解決済みのイベントカードが入る。山札へは戻らない（§6） */
+  discardPile: Card[];
+  /**
+   * 手番中に積み上がる未確定得点（§3）。
+   *
+   * 「やめる」で手番プレイヤーの points へ加算され、横穴（バースト）で
+   * ジャックポットへ移る。手番の開始時は 0。
+   */
+  pendingPoints: number;
+  /** ジャックポットに溜まった点数（§5） */
+  jackpotPoints: number;
   /** ジャックポットカウンター（0〜5） */
   jackpotCounter: number;
   currentPlayerIndex: number;
@@ -104,6 +114,7 @@ export function setupGame(playerNames: readonly string[], rng: Rng, config: Bala
     id: `p${index + 1}`,
     name,
     hand: take(config.initialHandSize),
+    points: 0,
   }));
 
   return {
@@ -111,7 +122,9 @@ export function setupGame(playerNames: readonly string[], rng: Rng, config: Bala
     lanes,
     players,
     drawPile: deck.slice(next),
-    jackpotPool: [],
+    discardPile: [],
+    pendingPoints: 0,
+    jackpotPoints: 0,
     jackpotCounter: 0,
     currentPlayerIndex: 0,
     round: 1,

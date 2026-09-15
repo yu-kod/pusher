@@ -61,6 +61,12 @@ describe("setupGame", () => {
       expect(new Set(state.players.map((p) => p.id)).size).toBe(4);
     });
 
+    it("得点 0 で始まる（docs/spec.md §2）", () => {
+      const state = setupGame(NAMES_4, createRng(1), buildConfig());
+
+      expect(state.players.every((p) => p.points === 0)).toBe(true);
+    });
+
     it("各プレイヤーに 5 枚ずつ配る（docs/spec.md §2）", () => {
       const state = setupGame(NAMES_4, createRng(1), buildConfig());
 
@@ -75,8 +81,16 @@ describe("setupGame", () => {
       expect(setupGame(NAMES_4, createRng(1), buildConfig()).jackpotCounter).toBe(0);
     });
 
-    it("ジャックポットプールは空で始まる", () => {
-      expect(setupGame(NAMES_4, createRng(1), buildConfig()).jackpotPool).toEqual([]);
+    it("ジャックポットの点数は 0 で始まる", () => {
+      expect(setupGame(NAMES_4, createRng(1), buildConfig()).jackpotPoints).toBe(0);
+    });
+
+    it("未確定得点は 0 で始まる（docs/spec.md §3）", () => {
+      expect(setupGame(NAMES_4, createRng(1), buildConfig()).pendingPoints).toBe(0);
+    });
+
+    it("捨て札は空で始まる", () => {
+      expect(setupGame(NAMES_4, createRng(1), buildConfig()).discardPile).toEqual([]);
     });
 
     it("最初の手番は先頭のプレイヤー", () => {
@@ -113,7 +127,7 @@ describe("setupGame", () => {
         ...state.drawPile,
         ...state.lanes.flatMap((l) => [...l.stock, ...l.pending.map((p) => p.card)]),
         ...state.players.flatMap((p) => p.hand),
-        ...state.jackpotPool,
+        ...state.discardPile,
       ];
 
       const countOf = (cards: typeof all) => {
