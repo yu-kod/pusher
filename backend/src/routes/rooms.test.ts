@@ -514,3 +514,135 @@ describe("ボディが JSON でない場合", () => {
     expect(res.status).toBe(400);
   });
 });
+
+describe("CPU プレイヤー（#16）", () => {
+  /** 人間1人 + CPU2人でゲームを開始する */
+  async function withCpus() {
+    const app = createApp({ store: createInMemoryRoomStore(), seed: 1 });
+    const created = await post(app, "/api/rooms", { name: "あなた" });
+    const { code, token } = (await created.json()) as { code: string; token: string };
+    await post(app, `/api/rooms/${code}/players`, { name: "CPU1", isCpu: true });
+    await post(app, `/api/rooms/${code}/players`, { name: "CPU2", isCpu: true });
+    await post(app, `/api/rooms/${code}/start`, {}, token);
+    return { app, code, token };
+  }
+
+  it("人間がやめると CPU の手番が自動で進み、人間へ戻ってくる", async () => {
+    const { app, code, token } = await withCpus();
+    const { handIndex } = await currentTurn(app, code, [token]);
+    await post(
+      app,
+      `/api/rooms/${code}/turns/insert`,
+      { laneIndex: 0, handIndexes: [handIndex] },
+      token
+    );
+
+    const res = await post(app, `/api/rooms/${code}/turns/stop`, {}, token);
+
+    const body = (await res.json()) as { game: { currentPlayerIndex: number; round: number } };
+    // CPU 2人が打ち終わってラウンドも進み、手番は人間（p1）へ戻る
+    expect(body.game.currentPlayerIndex).toBe(0);
+    expect(body.game.round).toBe(2);
+  });
+
+  it("CPU が得点を積む", async () => {
+    const { app, code, token } = await withCpus();
+    const { handIndex } = await currentTurn(app, code, [token]);
+    await post(
+      app,
+      `/api/rooms/${code}/turns/insert`,
+      { laneIndex: 0, handIndexes: [handIndex] },
+      token
+    );
+    await post(app, `/api/rooms/${code}/turns/stop`, {}, token);
+
+    const body = (await (await app.request(`/api/rooms/${code}`)).json()) as {
+      game: { players: { name: string; points: number }[] };
+    };
+    expect(
+      body.game.players.filter((p) => p.name.startsWith("CPU")).some((p) => p.points > 0)
+    ).toBe(true);
+  });
+
+  it("ゲーム開始時に手番が CPU なら、その場で人間まで進む", async () => {
+    const app = createApp({ store: createInMemoryRoomStore(), seed: 1 });
+    const created = await post(app, "/api/rooms", { name: "CPU1", isCpu: true });
+    const { code } = (await created.json()) as { code: string };
+    const joined = await post(app, `/api/rooms/${code}/players`, { name: "あなた" });
+    const { token } = (await joined.json()) as { token: string };
+    await post(app, `/api/rooms/${code}/players`, { name: "CPU2", isCpu: true });
+
+    const res = await post(app, `/api/rooms/${code}/start`, {}, token);
+
+    const body = (await res.json()) as { game: { currentPlayerIndex: number } };
+    expect(body.game.currentPlayerIndex).toBe(1);
+  });
+});
+
+describe("DELETE /api/rooms/:code/players/:id（CPU の削除）", () => {
+  async function lobbyWithCpu() {
+    const app = createApp({ store: createInMemoryRoomStore(), seed: 1 });
+    const created = await post(app, "/api/rooms", { name: "あなた" });
+    const { code, token } = (await created.json()) as { code: string; token: string };
+    await post(app, `/api/rooms/${code}/players`, { name: "CPU1", isCpu: true });
+    return { app, code, token };
+  }
+
+  function del(app: ReturnType<typeof createApp>, path: string, token?: string) {
+    return app.request(path, {
+      method: "DELETE",
+      headers: token === undefined ? {} : { Authorization: `Bearer ${token}` },
+    });
+  }
+
+  it("CPU を削除できる", async () => {
+    const { app, code, token } = await lobbyWithCpu();
+
+    const res = await del(app, `/api/rooms/${code}/players/p2`, token);
+
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { players: { id: string }[] };
+    expect(body.players.map((p) => p.id)).toEqual(["p1"]);
+  });
+
+  it("人間は削除できない", async () => {
+    const { app, code, token } = await lobbyWithCpu();
+
+    expect((await del(app, `/api/rooms/${code}/players/p1`, token)).status).toBe(422);
+  });
+
+  it("ゲーム開始後は削除できない", async () => {
+    const { app, code, token } = await lobbyWithCpu();
+    await post(app, `/api/rooms/${code}/players`, { name: "CPU2", isCpu: true });
+    await post(app, `/api/rooms/${code}/start`, {}, token);
+
+    expect((await del(app, `/api/rooms/${code}/players/p2`, token)).status).toBe(422);
+  });
+
+  it("いないプレイヤーなら 422", async () => {
+    const { app, code, token } = await lobbyWithCpu();
+
+    expect((await del(app, `/api/rooms/${code}/players/p9`, token)).status).toBe(422);
+  });
+
+  it("トークンがなければ 401", async () => {
+    const { app, code } = await lobbyWithCpu();
+
+    expect((await del(app, `/api/rooms/${code}/players/p2`)).status).toBe(401);
+  });
+
+  it("削除したあとも残りの id は変わらない", async () => {
+    const { app, code, token } = await lobbyWithCpu();
+    await post(app, `/api/rooms/${code}/players`, { name: "CPU2", isCpu: true });
+
+    await del(app, `/api/rooms/${code}/players/p2`, token);
+
+    const body = (await (await app.request(`/api/rooms/${code}`)).json()) as {
+      players: { id: string; name: string }[];
+    };
+    expect(body.players).toEqual([
+      { id: "p1", name: "あなた", isCpu: false },
+      { id: "p3", name: "CPU2", isCpu: true },
+    ]);
+  });
+});
