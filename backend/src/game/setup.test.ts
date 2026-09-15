@@ -110,7 +110,7 @@ describe("setupGame", () => {
 
       const all = [
         ...state.drawPile,
-        ...state.lanes.flatMap((l) => [...l.stock, ...l.pending]),
+        ...state.lanes.flatMap((l) => [...l.stock, ...l.pending.map((p) => p.card)]),
         ...state.players.flatMap((p) => p.hand),
         ...state.jackpotPool,
       ];

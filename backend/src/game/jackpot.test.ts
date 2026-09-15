@@ -1,10 +1,8 @@
 import { describe, expect, it } from "vitest";
-import type { Card, CoinCount } from "./deck.js";
 import { createRng, type Rng } from "./rng.js";
 import { DEFAULT_GAME_CONFIG, setupGame, type GameState } from "./setup.js";
+import { coin } from "../test-utils/cards.js";
 import { applySideHole, canRollJackpot, rollJackpot, settleJackpotAtGameEnd } from "./jackpot.js";
-
-const coin = (coins: CoinCount): Card => ({ kind: "coin", coins });
 
 /** 出目を並べて返す決定的な Rng */
 function scriptedRng(rolls: readonly number[]): Rng {
