@@ -1,6 +1,17 @@
 import type { LaneView } from "@/lib/types";
+import { PlayingCard } from "./PlayingCard";
+import { cardLabel } from "@/lib/cards";
 
 const LANE_NAMES = ["左", "中央", "右"];
+
+/** 奥の山として描く最大枚数。実際の枚数は数字で添える */
+const MAX_STOCK_CARDS = 4;
+/** 滞留エリアで重ねたカードをずらす量（px） */
+const STACK_OFFSET = 9;
+/** 奥の山で重ねたカードをずらす量（px）。厚みだけ見せたいので小さく */
+const STOCK_OFFSET = 3;
+/** 小サイズのカードの高さ（px）。PlayingCard の size="sm" に合わせる */
+const SMALL_CARD_HEIGHT = 56;
 
 type Props = {
   lane: LaneView;
@@ -13,16 +24,18 @@ type Props = {
 };
 
 /**
- * レーン1本。
+ * レーン1本を、机に置かれたトレイとして描く。
  *
- * 滞留の厚みが圧力そのものなので、枚数を数字だけでなく積み重ねでも見せる
- * （docs/spec.md §4-1）。中身は裏向きなので出さない。
+ * 上から順に `[奥：山] → [滞留エリア] → [末端：落下口]`（docs/spec.md §1）。
+ * 滞留の厚みが圧力そのものなので、枚数を数字だけでなくカードの重なりでも
+ * 見せる（§4-1）。中身は裏向きなので持たない。
  */
 export function Lane({ lane, index, target, selected, disabled, onSelect }: Props) {
-  // 表向きのカードだけ中身が見える（§6「横穴開放」のあと）
-  const revealed = lane.pending.flatMap((p) => (p.faceUp ? [p.card] : []));
+  const name = LANE_NAMES[index] ?? String(index);
   // 目標値6以上なら出目6が横穴になる（§5）
   const risky = target !== null && target >= 6;
+  const stockCards = Math.min(lane.stockCount, MAX_STOCK_CARDS);
+  const pendingHeight = SMALL_CARD_HEIGHT + Math.max(lane.pending.length - 1, 0) * STACK_OFFSET;
 
   return (
     <button
@@ -30,42 +43,77 @@ export function Lane({ lane, index, target, selected, disabled, onSelect }: Prop
       onClick={onSelect}
       disabled={disabled}
       aria-pressed={selected}
-      aria-label={`${LANE_NAMES[index] ?? String(index)}レーン`}
-      className={`flex flex-col items-center gap-2 rounded border-2 px-3 py-4 transition ${
-        selected ? "border-gray-900 bg-gray-50" : "border-gray-200"
-      } disabled:opacity-60`}
+      aria-label={`${name}レーン`}
+      className={`lane-tray flex flex-col items-center gap-1 rounded-lg border-2 px-1.5 pt-1.5 pb-2 transition ${
+        selected
+          ? "-translate-y-0.5 border-amber-300 ring-2 ring-amber-300/60"
+          : "border-black/40 hover:border-amber-200/40"
+      } disabled:opacity-70`}
     >
-      <span className="text-xs font-medium text-gray-500">{LANE_NAMES[index] ?? index}</span>
+      <span className="text-[11px] font-bold tracking-wider text-emerald-50/80">{name}</span>
 
-      <span className="text-xs text-gray-400">奥 {lane.stockCount}枚</span>
-
-      {/* 滞留の厚みを積み重ねで見せる */}
-      <span className="flex flex-col-reverse gap-0.5" aria-hidden="true">
-        {lane.pending.map((card, i) => (
-          <span
+      {/* 奥の山（裏向き）。枚数が多いほど厚く見える */}
+      <span
+        className="relative w-[40px]"
+        style={{ height: SMALL_CARD_HEIGHT + (stockCards - 1) * STOCK_OFFSET }}
+        aria-hidden="true"
+      >
+        {Array.from({ length: stockCards }, (_, i) => (
+          <PlayingCard
             key={i}
-            className={`h-1.5 w-10 rounded-sm ${card.faceUp ? "bg-amber-400" : "bg-gray-400"}`}
+            faceUp={false}
+            size="sm"
+            className="absolute left-0"
+            style={{ top: i * STOCK_OFFSET }}
           />
         ))}
       </span>
-      <span className="text-sm font-medium">滞留 {lane.pending.length}枚</span>
+      <span className="text-[10px] text-emerald-50/50">奥 {lane.stockCount}枚</span>
 
-      {revealed.length > 0 && (
-        <span className="text-xs text-amber-700">
-          公開 {revealed.map((card) => (card.kind === "coin" ? String(card.coins) : "?")).join(" ")}
+      {/* 滞留エリア。上が奥（先に押し込まれる側）、下が落下口に近い側 */}
+      <span className="relative w-[30px] rounded-sm bg-black/25" style={{ height: pendingHeight }}>
+        {lane.pending.map((entry, i) =>
+          entry.faceUp ? (
+            <PlayingCard
+              key={i}
+              faceUp
+              card={entry.card}
+              label={cardLabel(entry.card)}
+              size="sm"
+              className="animate-card-drop absolute left-0"
+              style={{ top: i * STACK_OFFSET }}
+            />
+          ) : (
+            <PlayingCard
+              key={i}
+              faceUp={false}
+              size="sm"
+              className="animate-card-drop absolute left-0"
+              style={{ top: i * STACK_OFFSET }}
+            />
+          )
+        )}
+      </span>
+      <span className="text-[11px] font-medium text-emerald-50">滞留 {lane.pending.length}枚</span>
+
+      {/* 末端の落下口 */}
+      <span className="lane-chute h-2.5 w-[46px] rounded-sm" aria-hidden="true" />
+      <span className="text-[10px] text-emerald-50/50">落下口</span>
+
+      {lane.hasExtraSlot && (
+        <span className="rounded bg-sky-200 px-1 text-[10px] font-bold text-sky-900">
+          投入口増設
         </span>
       )}
 
-      {lane.hasExtraSlot && <span className="text-xs text-blue-700">投入口増設</span>}
-
       {target !== null && (
         <span
-          className={`flex flex-col items-center text-sm font-bold ${
-            risky ? "text-red-700" : "text-gray-900"
+          className={`mt-0.5 flex flex-col items-center rounded px-1 py-0.5 text-[11px] font-bold ${
+            risky ? "bg-red-200 text-red-900" : "bg-amber-200 text-amber-950"
           }`}
         >
           <span className="whitespace-nowrap">目標値 {target}</span>
-          {risky && <span className="text-[10px] font-medium">横穴あり</span>}
+          {risky && <span className="text-[9px] font-medium">横穴あり</span>}
         </span>
       )}
     </button>

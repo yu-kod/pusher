@@ -69,7 +69,16 @@ describe("盤面", () => {
     expect(screen.getByText("奥 4枚")).toBeInTheDocument();
   });
 
-  it("公開された滞留の中身を見せる（docs/spec.md §6）", () => {
+  it("奥の山・滞留エリア・落下口の3領域を見せる（docs/spec.md §1）", () => {
+    setup(buildGame({ lanes: [buildLane({ stockCount: 4 }), buildLane(), buildLane()] }));
+
+    const lane = screen.getByRole("button", { name: "左レーン" });
+    expect(within(lane).getByText("奥 4枚")).toBeInTheDocument();
+    expect(within(lane).getByText("滞留 0枚")).toBeInTheDocument();
+    expect(within(lane).getByText("落下口")).toBeInTheDocument();
+  });
+
+  it("公開された滞留の中身を表向きのカードで見せる（docs/spec.md §6）", () => {
     setup(
       buildGame({
         lanes: [
@@ -80,13 +89,21 @@ describe("盤面", () => {
       })
     );
 
-    expect(screen.getByText("公開 3")).toBeInTheDocument();
+    const lane = screen.getByRole("button", { name: "左レーン" });
+    expect(within(lane).getByRole("img", { name: "3コイン札" })).toBeInTheDocument();
   });
 
   it("増設マーカーを見せる", () => {
     setup(buildGame({ lanes: [buildLane({ hasExtraSlot: true }), buildLane(), buildLane()] }));
 
     expect(screen.getByText("投入口増設")).toBeInTheDocument();
+  });
+
+  it("山札と捨て札を場に出す（docs/spec.md §1）", () => {
+    setup(buildGame({ drawPileCount: 37, discardPileCount: 6 }));
+
+    expect(screen.getByText("山札 37枚")).toBeInTheDocument();
+    expect(screen.getByText("捨て札 6枚")).toBeInTheDocument();
   });
 
   it("全員の得点と手札枚数を見せる", () => {
@@ -191,8 +208,10 @@ describe("投入", () => {
     await user.click(screen.getByRole("button", { name: "左レーン" }));
     await user.click(screen.getByRole("button", { name: "投入する" }));
 
-    expect(await screen.findByText(/出目/)).toHaveTextContent("出目 3 / 目標値 4 → 成功");
-    expect(screen.getByText(/獲得 2点/)).toBeInTheDocument();
+    expect(await screen.findByRole("img", { name: "出目 3" })).toBeInTheDocument();
+    expect(screen.getByText(/目標値 4/)).toBeInTheDocument();
+    expect(screen.getByText("成功")).toBeInTheDocument();
+    expect(screen.getByText(/獲得/)).toHaveTextContent("獲得 2点");
   });
 
   it("横穴を踏んだら知らせる（docs/spec.md §5）", async () => {
@@ -414,7 +433,7 @@ describe("レーン本数が違う設定", () => {
 });
 
 describe("公開された滞留にイベントカードがある場合", () => {
-  it("中身を ? で見せる（正常系では起こらない防御的な表示）", () => {
+  it("イベント札として見せる（正常系では起こらない防御的な表示）", () => {
     setup(
       buildGame({
         lanes: [
@@ -425,6 +444,7 @@ describe("公開された滞留にイベントカードがある場合", () => {
       })
     );
 
-    expect(screen.getByText("公開 ?")).toBeInTheDocument();
+    const lane = screen.getByRole("button", { name: "左レーン" });
+    expect(within(lane).getByRole("img", { name: "イベント: avalanche" })).toBeInTheDocument();
   });
 });

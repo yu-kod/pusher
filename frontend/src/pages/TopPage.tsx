@@ -61,58 +61,67 @@ export function TopPage() {
   };
 
   return (
-    <main className="mx-auto max-w-md p-6">
-      <h1 className="text-3xl font-bold">PUSHER TABLE</h1>
-      <p className="mt-2 text-sm text-gray-600">
-        メダルゲームのプッシャー台をカードとダイスで再現する、3〜4人用のボードゲーム。
-      </p>
+    <main className="table-felt min-h-dvh px-6 py-10 text-emerald-50">
+      <div className="mx-auto max-w-md">
+        <div className="flex items-end justify-center gap-1" aria-hidden="true">
+          <span className="card-back h-16 w-11 rotate-[-8deg] rounded border border-black/30 shadow-lg" />
+          <span className="card-back h-16 w-11 rounded border border-black/30 shadow-lg" />
+          <span className="card-back h-16 w-11 rotate-[8deg] rounded border border-black/30 shadow-lg" />
+        </div>
+        <h1 className="mt-6 text-center text-3xl font-bold tracking-wide text-amber-200">
+          PUSHER TABLE
+        </h1>
+        <p className="mt-2 text-center text-sm text-emerald-50/70">
+          メダルゲームのプッシャー台をカードとダイスで再現する、3〜4人用のボードゲーム。
+        </p>
 
-      <div className="mt-8 space-y-2">
-        <label htmlFor="name" className="block text-sm font-medium">
-          表示名
-        </label>
-        <input
-          id="name"
-          value={name}
-          onChange={(event) => setName(event.target.value)}
-          maxLength={20}
-          autoComplete="nickname"
-          className="w-full rounded border border-gray-300 px-3 py-2"
-        />
+        <div className="mt-8 space-y-2">
+          <label htmlFor="name" className="block text-sm font-medium">
+            表示名
+          </label>
+          <input
+            id="name"
+            value={name}
+            onChange={(event) => setName(event.target.value)}
+            maxLength={20}
+            autoComplete="nickname"
+            className="w-full rounded border border-white/20 bg-black/25 px-3 py-2 text-emerald-50 placeholder:text-emerald-50/40"
+          />
+        </div>
+
+        <ErrorMessage message={error} />
+
+        <form onSubmit={onCreate} className="mt-6">
+          <button
+            type="submit"
+            disabled={busy}
+            className="w-full rounded-lg bg-amber-400 px-4 py-3 font-bold text-amber-950 shadow-[0_3px_0_#92400e] active:translate-y-0.5 active:shadow-[0_1px_0_#92400e] disabled:opacity-50"
+          >
+            ルームを作る
+          </button>
+        </form>
+
+        <form onSubmit={onJoin} className="mt-8 space-y-2 border-t border-white/15 pt-6">
+          <label htmlFor="code" className="block text-sm font-medium">
+            ルームコード
+          </label>
+          <input
+            id="code"
+            value={code}
+            onChange={(event) => setCode(event.target.value)}
+            maxLength={6}
+            autoCapitalize="characters"
+            className="w-full rounded border border-white/20 bg-black/25 px-3 py-2 font-mono tracking-widest text-emerald-50 uppercase"
+          />
+          <button
+            type="submit"
+            disabled={busy}
+            className="w-full rounded-lg border-2 border-emerald-50/50 px-4 py-3 font-bold text-emerald-50 disabled:opacity-50"
+          >
+            参加する
+          </button>
+        </form>
       </div>
-
-      <ErrorMessage message={error} />
-
-      <form onSubmit={onCreate} className="mt-6">
-        <button
-          type="submit"
-          disabled={busy}
-          className="w-full rounded bg-gray-900 px-4 py-3 font-medium text-white disabled:opacity-50"
-        >
-          ルームを作る
-        </button>
-      </form>
-
-      <form onSubmit={onJoin} className="mt-8 space-y-2 border-t border-gray-200 pt-6">
-        <label htmlFor="code" className="block text-sm font-medium">
-          ルームコード
-        </label>
-        <input
-          id="code"
-          value={code}
-          onChange={(event) => setCode(event.target.value)}
-          maxLength={6}
-          autoCapitalize="characters"
-          className="w-full rounded border border-gray-300 px-3 py-2 font-mono tracking-widest uppercase"
-        />
-        <button
-          type="submit"
-          disabled={busy}
-          className="w-full rounded border border-gray-900 px-4 py-3 font-medium disabled:opacity-50"
-        >
-          参加する
-        </button>
-      </form>
     </main>
   );
 }
