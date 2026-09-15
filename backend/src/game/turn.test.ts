@@ -87,9 +87,18 @@ describe("classifyRoll", () => {
 });
 
 describe("insertIntoLanes", () => {
-  /** 手番プレイヤーの手札と、先頭レーンの滞留枚数を指定した初期状態を作る */
-  function stateWithHand(coins: readonly (1 | 2 | 3)[], pendingCount = 0) {
-    const base = setupGame(["A", "B", "C"], createRng(1), DEFAULT_BALANCE);
+  /**
+   * 手番プレイヤーの手札と、先頭レーンの滞留枚数を指定した初期状態を作る。
+   *
+   * 複数レーンへの同時投入は既定では 1レーンに制限されている（#55）ため、
+   * その振る舞いを見るテストでは multiLane を適用する。
+   */
+  function stateWithHand(coins: readonly (1 | 2 | 3)[], pendingCount = 0, multiLane = false) {
+    const base = setupGame(
+      ["A", "B", "C"],
+      createRng(1),
+      multiLane ? withPreset("multiLane") : DEFAULT_BALANCE
+    );
     const players = base.players.map((p, i) =>
       i === 0 ? { ...p, hand: coins.map((c) => ({ kind: "coin" as const, coins: c })) } : p
     );
@@ -156,9 +165,9 @@ describe("insertIntoLanes", () => {
     expect(result.state.players[1]?.hand).toHaveLength(4);
   });
 
-  describe("複数レーンへの同時投入（docs/spec.md §3 投入ラウンド）", () => {
+  describe("複数レーンへの同時投入（config.maxLanesPerRound を上げた場合）", () => {
     it("各レーンへ1枚ずつ同時に投入できる", () => {
-      const state = stateWithHand([3, 2, 1]);
+      const state = stateWithHand([3, 2, 1], 0, true);
 
       const result = insertIntoLanes(state, [
         { laneIndex: 0, handIndexes: [0] },
@@ -180,7 +189,7 @@ describe("insertIntoLanes", () => {
     });
 
     it("手札の添字は投入前の手札に対する添字として解釈する", () => {
-      const state = stateWithHand([3, 2, 1]);
+      const state = stateWithHand([3, 2, 1], 0, true);
 
       const result = insertIntoLanes(state, [
         { laneIndex: 0, handIndexes: [0] },
@@ -194,7 +203,7 @@ describe("insertIntoLanes", () => {
     });
 
     it("レーンごとの内訳を左から順に返す（§3 の解決順）", () => {
-      const state = stateWithHand([3, 1], 2);
+      const state = stateWithHand([3, 1], 2, true);
 
       const result = insertIntoLanes(state, [
         { laneIndex: 2, handIndexes: [1] },
@@ -269,7 +278,7 @@ describe("insertIntoLanes", () => {
       const state = stateWithHand([3, 2]);
 
       expect(() =>
-        insertIntoLanes(state, [
+        insertIntoLanes({ ...state, config: withPreset("multiLane") }, [
           { laneIndex: 0, handIndexes: [0] },
           { laneIndex: 0, handIndexes: [1] },
         ])
@@ -280,15 +289,15 @@ describe("insertIntoLanes", () => {
       const state = stateWithHand([3, 2]);
 
       expect(() =>
-        insertIntoLanes(state, [
+        insertIntoLanes({ ...state, config: withPreset("multiLane") }, [
           { laneIndex: 0, handIndexes: [0] },
           { laneIndex: 1, handIndexes: [0] },
         ])
       ).toThrow(Error);
     });
 
-    it("config.maxLanesPerRound を超えるレーン数なら例外を投げる", () => {
-      const state = { ...stateWithHand([3, 2, 1]), config: withPreset("singleLane") };
+    it("config.maxLanesPerRound を超えるレーン数なら例外を投げる（既定は1レーン）", () => {
+      const state = stateWithHand([3, 2, 1]);
 
       expect(() =>
         insertIntoLanes(state, [

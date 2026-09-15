@@ -104,27 +104,28 @@ describe("endRound（ラウンド終了処理）", () => {
   /** シャッフルせずそのまま返す Rng。山札の並びを追えるようにする */
   const noShuffle = { shuffle: <T>(items: readonly T[]): T[] => [...items] };
 
-  it("各プレイヤーが山札から2枚ドローする（docs/spec.md §3）", () => {
+  it("各プレイヤーが山札から3枚ドローする（docs/spec.md §3）", () => {
     const state = buildState({
-      drawPile: [coin(1), coin(1), coin(2), coin(2), coin(3), coin(3)],
+      drawPile: [coin(1), coin(1), coin(1), coin(2), coin(2), coin(2), coin(3), coin(3), coin(3)],
     });
 
     const result = endRound(state, { ...noRolls, ...noShuffle }, chooser);
 
     expect(result.state.players.map((p) => p.hand)).toEqual([
-      [coin(1), coin(1)],
-      [coin(2), coin(2)],
-      [coin(3), coin(3)],
+      [coin(1), coin(1), coin(1)],
+      [coin(2), coin(2), coin(2)],
+      [coin(3), coin(3), coin(3)],
     ]);
     expect(result.state.drawPile).toEqual([]);
   });
 
   it("既存の手札に積み増す", () => {
-    const base = buildState({ drawPile: [coin(1), coin(1), coin(1), coin(1), coin(1), coin(1)] });
+    const base = buildState({ drawPile: Array.from({ length: 9 }, () => coin(1)) });
     const state = { ...base, players: base.players.map((p) => ({ ...p, hand: [coin(3)] })) };
 
     expect(endRound(state, { ...noRolls, ...noShuffle }, chooser).state.players[0]?.hand).toEqual([
       coin(3),
+      coin(1),
       coin(1),
       coin(1),
     ]);
@@ -166,22 +167,22 @@ describe("endRound（ラウンド終了処理）", () => {
     it("捨て札をシャッフルして山札とする", () => {
       const state = buildState({
         drawPile: [coin(1)],
-        discardPile: [coin(2), coin(2), coin(2), coin(2), coin(2)],
+        discardPile: Array.from({ length: 8 }, () => coin(2)),
       });
 
       const result = endRound(state, { ...noRolls, ...noShuffle }, chooser);
 
-      expect(result.state.players[0]?.hand).toEqual([coin(1), coin(2)]);
+      expect(result.state.players[0]?.hand).toEqual([coin(1), coin(2), coin(2)]);
       expect(result.state.discardPile).toEqual([]);
       expect(result.deckExhausted).toBe(false);
     });
 
     it("捨て札も尽きたらあるぶんだけ引いて終了を知らせる", () => {
-      const state = buildState({ drawPile: [coin(1), coin(1), coin(1)], discardPile: [] });
+      const state = buildState({ drawPile: [coin(1), coin(1), coin(1), coin(1)], discardPile: [] });
 
       const result = endRound(state, { ...noRolls, ...noShuffle }, chooser);
 
-      expect(result.state.players.map((p) => p.hand.length)).toEqual([2, 1, 0]);
+      expect(result.state.players.map((p) => p.hand.length)).toEqual([3, 1, 0]);
       expect(result.deckExhausted).toBe(true);
     });
 
@@ -195,14 +196,24 @@ describe("endRound（ラウンド終了処理）", () => {
     it("シャッフルには渡された Rng を使う", () => {
       const state = buildState({
         drawPile: [],
-        discardPile: [coin(1), coin(2), coin(3), coin(1), coin(2), coin(3)],
+        discardPile: [
+          coin(1),
+          coin(2),
+          coin(3),
+          coin(1),
+          coin(2),
+          coin(3),
+          coin(1),
+          coin(2),
+          coin(3),
+        ],
       });
 
       // 逆順に並べ替える Rng
       const reversing = { shuffle: <T>(items: readonly T[]): T[] => [...items].reverse() };
 
       expect(endRound(state, { ...noRolls, ...reversing }, chooser).state.players[0]?.hand).toEqual(
-        [coin(3), coin(2)]
+        [coin(3), coin(2), coin(1)]
       );
     });
   });
@@ -370,18 +381,19 @@ describe("ラウンド終了時に引いたイベント（docs/spec.md §6）", 
 
   it("イベントカードは手札に入らない（ルール解釈メモ）", () => {
     const state = buildState({
-      drawPile: [eventCard("extraSlot"), coin(1), coin(1), coin(1), coin(1), coin(1)],
+      drawPile: [eventCard("extraSlot"), ...Array.from({ length: 8 }, () => coin(1))],
     });
 
     const result = endRound(state, { ...scriptedRng([]), ...noShuffle }, chooser);
 
-    expect(result.state.players[0]?.hand).toEqual([coin(1)]);
+    // 3枚ドローのうち1枚がイベントだったので、手札に入るのは2枚
+    expect(result.state.players[0]?.hand).toEqual([coin(1), coin(1)]);
     expect(result.state.players.flatMap((p) => p.hand).every((c) => c.kind === "coin")).toBe(true);
   });
 
   it("その場で効果を解決して捨て札にする（§6）", () => {
     const state = buildState({
-      drawPile: [eventCard("extraSlot"), coin(1), coin(1), coin(1), coin(1), coin(1)],
+      drawPile: [eventCard("extraSlot"), ...Array.from({ length: 8 }, () => coin(1))],
     });
 
     const result = endRound(
@@ -399,7 +411,7 @@ describe("ラウンド終了時に引いたイベント（docs/spec.md §6）", 
 
   it("引き直しはしない（ドロー枚数は変わらない）", () => {
     const state = buildState({
-      drawPile: [eventCard("extraSlot"), coin(1), coin(1), coin(1), coin(1), coin(1)],
+      drawPile: [eventCard("extraSlot"), ...Array.from({ length: 8 }, () => coin(1))],
     });
 
     const result = endRound(state, { ...scriptedRng([]), ...noShuffle }, chooser);
@@ -409,7 +421,14 @@ describe("ラウンド終了時に引いたイベント（docs/spec.md §6）", 
 
   it("効果の得点は引いた人のものとして即座に確定する（ルール解釈メモ）", () => {
     const base = buildState({
-      drawPile: [coin(1), coin(1), eventCard("openLane"), coin(1), coin(1), coin(1)],
+      drawPile: [
+        coin(1),
+        coin(1),
+        coin(1),
+        coin(1),
+        eventCard("openLane"),
+        ...Array.from({ length: 4 }, () => coin(1)),
+      ],
     });
     const state = {
       ...base,
@@ -427,7 +446,7 @@ describe("ラウンド終了時に引いたイベント（docs/spec.md §6）", 
 
   it("「投入口増設」でも追加手番は発生しない（ルール解釈メモ）", () => {
     const state = buildState({
-      drawPile: [eventCard("extraSlot"), coin(1), coin(1), coin(1), coin(1), coin(1)],
+      drawPile: [eventCard("extraSlot"), ...Array.from({ length: 8 }, () => coin(1))],
     });
 
     const result = endRound(state, { ...scriptedRng([]), ...noShuffle }, chooser);
@@ -437,7 +456,12 @@ describe("ラウンド終了時に引いたイベント（docs/spec.md §6）", 
 
   it("「抽選抽選」は引いた人が JP判定を行う", () => {
     const state = buildState({
-      drawPile: [coin(1), coin(1), coin(1), coin(1), eventCard("lottery"), coin(1)],
+      drawPile: [
+        ...Array.from({ length: 6 }, () => coin(1)),
+        eventCard("lottery"),
+        coin(1),
+        coin(1),
+      ],
       jackpotCounter: 3,
       jackpotPoints: 9,
     });
@@ -450,7 +474,7 @@ describe("ラウンド終了時に引いたイベント（docs/spec.md §6）", 
   });
 
   it("イベントを引かなければ events は空", () => {
-    const state = buildState({ drawPile: Array.from({ length: 6 }, () => coin(1)) });
+    const state = buildState({ drawPile: Array.from({ length: 9 }, () => coin(1)) });
 
     expect(endRound(state, { ...scriptedRng([]), ...noShuffle }, chooser).events).toEqual([]);
   });

@@ -54,10 +54,11 @@ export type Balance = {
   /**
    * 1回の投入ラウンドで投入できるレーンの数（§3）。
    *
-   * 各レーンへ最大1枚ずつ投入でき、投入したレーンの数だけダイスを振る。
-   * そのままチキンレースのリスク調整ダイヤルになる（k レーンなら
-   * バースト確率 1-(5/6)^k）。1 にすると押し引きの幅がなくなる
-   * → プリセット singleLane。
+   * 既定は 1。#39 は「投入するレーン数をリスクの調整ダイヤルにする」設計だったが、
+   * 実測では**手番の長さが手札の枚数で決まってしまい**、押し引きが成立しなかった
+   * （1手番あたり 1.03 ラウンド。目標 2〜4）。1レーンに絞って手番を長くすることで、
+   * 「もう1ラウンド行くか」の判断そのものがリスクダイヤルになる（#55）。
+   * → プリセット multiLane（全レーンへ1枚ずつ）で以前のルールに戻せる。
    */
   maxLanesPerRound: number;
 
@@ -73,9 +74,13 @@ export type Balance = {
   /**
    * ラウンド終了時に各プレイヤーがドローする枚数（§3）。
    *
-   * 既定は 2 枚。毎手番2枚投入で収支が均衡し、3枚で消耗、1枚で蓄積する設計
-   * （§7 最優先「ドロー枚数と投入枚数の関係」）。
-   * → プリセット noRoundDraw（0枚）/ roundDraw1 / roundDraw3 で比較する。
+   * 既定は 3 枚。1投入ラウンドで1枚使うので、そのまま**1手番に何ラウンド回せるか**を
+   * 決める（#55）。
+   *
+   *   1手番の投入ラウンド数 ≒ ドロー枚数 ÷ 1ラウンドの投入枚数
+   *
+   * 2枚では 2.01 ラウンドで目標の下限に張り付く。3枚で 2.89 ラウンドになる。
+   * → プリセット noRoundDraw（0枚）/ roundDraw1 / roundDraw2 で比較する。
    */
   roundDrawCount: number;
 
@@ -100,7 +105,14 @@ export type Balance = {
    */
   handLimit: number | null;
 
-  /** この数のラウンドが終わったらゲーム終了（§3） */
+  /**
+   * この数のラウンドが終わったらゲーム終了（§3）。
+   *
+   * 既定は 13。**最終ラウンドで最後に手番を打つ席が有利**になるため、この席が
+   * スタートプレイヤーの交代と噛み合わないラウンド数を選ぶ必要がある（#55）。
+   * 12 は 3人・4人のどちらでも割り切れてしまい、特定の席に有利が固定される。
+   * 13 は 3 とも 4 とも互いに素なので、手番順ごとの勝率の差が 0.02〜0.03 に収まる。
+   */
   maxRounds: number;
 
   /**
@@ -154,12 +166,12 @@ export const DEFAULT_BALANCE: Balance = {
   initialHandSize: 5,
   deck: DEFAULT_DECK_CONFIG,
 
-  maxLanesPerRound: LANE_COUNT,
+  maxLanesPerRound: 1,
   maxInsertionRoundsPerTurn: null,
-  roundDrawCount: 2,
+  roundDrawCount: 3,
   roundLaneRefillCount: 0,
   handLimit: null,
-  maxRounds: 12,
+  maxRounds: 13,
   rotateStartPlayer: true,
 
   pushCount: (totalCoins) => Math.ceil(totalCoins / 2),
@@ -175,10 +187,8 @@ export const DEFAULT_BALANCE: Balance = {
  * それぞれ「§7 が何と比較せよと言っているか」に1対1で対応する。
  */
 export const BALANCE_PRESETS = {
-  /** §7 次点: レーンを3本に減らす */
-  lanes3: { laneCount: 3, maxLanesPerRound: 3 },
-  /** §7 次点: レーン4本（既定と同じ。比較対象として明示する） */
-  lanes4: { laneCount: 4, maxLanesPerRound: 4 },
+  /** §7 次点: レーンを4本に増やす（v0.1 の構成） */
+  lanes4: { laneCount: 4 },
 
   /**
    * #53 以前の既定: 3コイン札をコイン札の 25% に戻す。
@@ -192,10 +202,10 @@ export const BALANCE_PRESETS = {
 
   /** §7: ラウンド終了時のドローを廃止する */
   noRoundDraw: { roundDrawCount: 0 },
-  /** §7: ドローを1枚に減らす（投入1枚で均衡する） */
+  /** §7: ドローを1枚に減らす（投入ラウンド数 1.12 まで落ちる） */
   roundDraw1: { roundDrawCount: 1 },
-  /** §7: ドローを3枚に増やす（全レーンへ撒き続けられる） */
-  roundDraw3: { roundDrawCount: 3 },
+  /** #55 以前の既定: ドロー2枚（投入ラウンド数 2.01） */
+  roundDraw2: { roundDrawCount: 2 },
 
   /** #53 以前の既定: 押し込み枚数をコイン数そのままにする（滞留 1.10 枚） */
   pushFull: { pushCount: (totalCoins: number) => totalCoins },
@@ -216,8 +226,8 @@ export const BALANCE_PRESETS = {
   /** §7 次点: 手札上限を 7 枚に設ける（§3 の原案） */
   handLimit7: { handLimit: 7 },
 
-  /** #39 の変更前のルール: 1回の投入ラウンドで1レーンだけ */
-  singleLane: { maxLanesPerRound: 1 },
+  /** #55 以前のルール: 1回の投入ラウンドで全レーンへ1枚ずつ投入できる */
+  multiLane: { maxLanesPerRound: LANE_COUNT },
 
   /** §7: 1手番あたりの投入ラウンドを3回までに制限する */
   insertionRounds3: { maxInsertionRoundsPerTurn: 3 },

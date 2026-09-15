@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { coin, faceDown } from "../test-utils/cards.js";
 import type { Card } from "./deck.js";
 import { scriptedRng } from "../test-utils/rng.js";
-import { DEFAULT_BALANCE } from "./balance.js";
+import { DEFAULT_BALANCE, withPreset } from "./balance.js";
 import { createRng } from "./rng.js";
 import { setupGame, type GameState, type Lane } from "./setup.js";
 import type { EventChooser } from "./resolve.js";
@@ -46,7 +46,7 @@ function buildState(
 
 describe("resolveInsertionRound（投入ラウンド）", () => {
   it("投入したレーンの数だけダイスを振る（docs/spec.md §3）", () => {
-    const state = buildState([1, 1, 1], [{}, {}, {}]);
+    const state = buildState([1, 1, 1], [{}, {}, {}], { config: withPreset("multiLane") });
 
     const result = resolveInsertionRound(
       state,
@@ -64,7 +64,9 @@ describe("resolveInsertionRound（投入ラウンド）", () => {
 
   it("レーンごとに独立して判定する（docs/spec.md §3）", () => {
     // 目標値はどちらも 1（コイン1枚・滞留なし）。出目1で成功、出目2で失敗
-    const state = buildState([1, 1], [{ stock: [coin(3)] }, { stock: [coin(3)] }, {}]);
+    const state = buildState([1, 1], [{ stock: [coin(3)] }, { stock: [coin(3)] }, {}], {
+      config: withPreset("multiLane"),
+    });
 
     const result = resolveInsertionRound(
       state,
@@ -155,7 +157,9 @@ describe("resolveInsertionRound（投入ラウンド）", () => {
   });
 
   it("複数レーンで成功したら左から順に解決する（docs/spec.md §3）", () => {
-    const state = buildState([1, 1], [{ stock: [coin(1)] }, { stock: [coin(2)] }, {}]);
+    const state = buildState([1, 1], [{ stock: [coin(1)] }, { stock: [coin(2)] }, {}], {
+      config: withPreset("multiLane"),
+    });
 
     const result = resolveInsertionRound(
       state,
@@ -296,6 +300,7 @@ describe("resolveInsertionRound（投入ラウンド）", () => {
     it("同じラウンドで2レーンが横穴でも横穴は1回として扱う（docs/spec.md ルール解釈メモ）", () => {
       const state = buildState([1, 1], [bustableLane(), bustableLane(), {}], {
         jackpotCounter: 0,
+        config: withPreset("multiLane"),
       });
 
       const result = resolveInsertionRound(
@@ -507,7 +512,9 @@ describe("resolveInsertionRound（投入ラウンド）", () => {
     }
 
     it.each([1, 2, 3])("%i レーンに投入したバースト確率は 1-(5/6)^k になる", (laneCount) => {
-      const state = buildState([1, 1, 1], [bustable(), bustable(), bustable()]);
+      const state = buildState([1, 1, 1], [bustable(), bustable(), bustable()], {
+        config: withPreset("multiLane"),
+      });
       const insertions = Array.from({ length: laneCount }, (_, i) => ({
         laneIndex: i,
         handIndexes: [i],

@@ -222,6 +222,6 @@ describe("DEFAULT_BALANCE", () => {
     expect(DEFAULT_BALANCE.initialPendingCards).toBe(5);
     expect(DEFAULT_BALANCE.initialHandSize).toBe(5);
     expect(DEFAULT_BALANCE.handLimit).toBeNull();
-    expect(DEFAULT_BALANCE.maxRounds).toBe(12);
+    expect(DEFAULT_BALANCE.maxRounds).toBe(13);
   });
 });

@@ -75,7 +75,7 @@ function format(summary: Summary): string {
     `  手番あたり投入R数   ${round(summary.avgInsertionRoundsPerTurn)}  (目標 2〜4)`,
     `  自分でやめた割合    ${round(summary.voluntaryStopRate)}  (目標 0.3 以上)`,
     `  投入レーン数        ${round(summary.avgLanesPerInsertion)}  (上限に張り付いていないか)`,
-    `  やめた時点の得点    ${round(summary.avgStopPoints)}  (机上計算では 15〜20)`,
+    `  やめた時点の得点    ${round(summary.avgStopPoints)}  (1手番の取り分と同程度が目安)`,
     "",
     `バースト率            ${round(summary.bustRate)}`,
     `投入1枚の回収         ${round(summary.pointsPerInsertedCard)}  (絶対値に目標はない)`,
