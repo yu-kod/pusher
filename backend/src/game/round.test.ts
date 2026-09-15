@@ -170,6 +170,187 @@ describe("resolveInsertionRound（投入ラウンド）", () => {
     expect(result.lanes[0]).toMatchObject({ laneIndex: 0, insertedCoins: 3, target: 5 });
   });
 
+  describe("横穴（バースト）", () => {
+    /**
+     * 目標値6以上のレーンを作る。出目6 で横穴になる。
+     *
+     * 滞留5枚 + 1コイン札で目標値6。レーンの中身は落下用に多めに積む。
+     */
+    const bustableLane = (): Partial<Lane> => ({
+      stock: [coin(1), coin(1)],
+      pending: faceDown([coin(1), coin(1), coin(1), coin(1), coin(1)]),
+    });
+
+    it("横穴が出たことを返す（docs/spec.md §5）", () => {
+      const state = buildState([1], [bustableLane()]);
+
+      const result = resolveInsertionRound(
+        state,
+        [{ laneIndex: 0, handIndexes: [0] }],
+        scriptedRng([6])
+      );
+
+      expect(result.lanes[0]?.outcome).toBe("sideHole");
+      expect(result.busted).toBe(true);
+    });
+
+    it("押し出し自体は通常どおり発生する（docs/spec.md §5）", () => {
+      const state = buildState([1], [bustableLane()]);
+
+      const result = resolveInsertionRound(
+        state,
+        [{ laneIndex: 0, handIndexes: [0] }],
+        scriptedRng([6])
+      );
+
+      expect(result.lanes[0]?.fallenCards).toEqual([coin(1)]);
+    });
+
+    it("未確定得点がすべてジャックポットへ移る（docs/spec.md §3 §5）", () => {
+      const state = buildState([1], [bustableLane()], { pendingPoints: 9 });
+
+      const result = resolveInsertionRound(
+        state,
+        [{ laneIndex: 0, handIndexes: [0] }],
+        scriptedRng([6])
+      );
+
+      // 積み上がっていた 9 点 + このラウンドの落下分 1 点
+      expect(result.state.jackpotPoints).toBe(10);
+      expect(result.state.pendingPoints).toBe(0);
+    });
+
+    it("すでに確定した得点は失われない（docs/spec.md §3）", () => {
+      const base = buildState([1], [bustableLane()], { pendingPoints: 9 });
+      const state = { ...base, players: base.players.map((p) => ({ ...p, points: 12 })) };
+
+      const result = resolveInsertionRound(
+        state,
+        [{ laneIndex: 0, handIndexes: [0] }],
+        scriptedRng([6])
+      );
+
+      expect(result.state.players[0]?.points).toBe(12);
+    });
+
+    it("ジャックポットカウンターを1つ進める（docs/spec.md §5）", () => {
+      const state = buildState([1], [bustableLane()], { jackpotCounter: 2 });
+
+      const result = resolveInsertionRound(
+        state,
+        [{ laneIndex: 0, handIndexes: [0] }],
+        scriptedRng([6])
+      );
+
+      expect(result.state.jackpotCounter).toBe(3);
+    });
+
+    it("横穴が出なければジャックポットへは移らない", () => {
+      const state = buildState([1], [bustableLane()], { pendingPoints: 9 });
+
+      const result = resolveInsertionRound(
+        state,
+        [{ laneIndex: 0, handIndexes: [0] }],
+        scriptedRng([5])
+      );
+
+      expect(result.busted).toBe(false);
+      expect(result.state.jackpotPoints).toBe(0);
+      expect(result.state.pendingPoints).toBeGreaterThan(9);
+    });
+
+    it("目標値が6未満のレーンでは出目6でも横穴にならない（docs/spec.md §3）", () => {
+      const state = buildState([1], [{ stock: [coin(3)] }]);
+
+      const result = resolveInsertionRound(
+        state,
+        [{ laneIndex: 0, handIndexes: [0] }],
+        scriptedRng([6])
+      );
+
+      expect(result.lanes[0]?.outcome).toBe("failure");
+      expect(result.busted).toBe(false);
+    });
+
+    it("同じラウンドで2レーンが横穴でも横穴は1回として扱う（docs/spec.md ルール解釈メモ）", () => {
+      const state = buildState([1, 1], [bustableLane(), bustableLane(), {}], {
+        jackpotCounter: 0,
+      });
+
+      const result = resolveInsertionRound(
+        state,
+        [
+          { laneIndex: 0, handIndexes: [0] },
+          { laneIndex: 1, handIndexes: [1] },
+        ],
+        scriptedRng([6, 6])
+      );
+
+      expect(result.lanes.map((l) => l.outcome)).toEqual(["sideHole", "sideHole"]);
+      expect(result.state.jackpotCounter).toBe(1);
+      // 両レーンの落下分がまとめてジャックポットへ
+      expect(result.state.jackpotPoints).toBe(2);
+    });
+
+    it("カウンターが閾値に達したら即座に JP判定を行う（docs/spec.md §5）", () => {
+      const state = buildState([1], [bustableLane()], {
+        jackpotCounter: 4,
+        jackpotPoints: 20,
+        pendingPoints: 0,
+      });
+
+      // 1個目が投入ラウンドの出目、2個目が JP判定の出目
+      const result = resolveInsertionRound(
+        state,
+        [{ laneIndex: 0, handIndexes: [0] }],
+        scriptedRng([6, 6])
+      );
+
+      expect(result.jackpot).toEqual({ roll: 6, won: true, wonPoints: 21 });
+      expect(result.state.players[0]?.points).toBe(21);
+      expect(result.state.jackpotCounter).toBe(0);
+    });
+
+    it("JP判定に外れたらカウンターは据え置き（docs/spec.md §5）", () => {
+      const state = buildState([1], [bustableLane()], { jackpotCounter: 4, jackpotPoints: 20 });
+
+      const result = resolveInsertionRound(
+        state,
+        [{ laneIndex: 0, handIndexes: [0] }],
+        scriptedRng([6, 3])
+      );
+
+      expect(result.jackpot).toEqual({ roll: 3, won: false, wonPoints: 0 });
+      expect(result.state.jackpotCounter).toBe(5);
+      expect(result.state.jackpotPoints).toBe(21);
+    });
+
+    it("カウンターが閾値未満なら JP判定は行わない", () => {
+      const state = buildState([1], [bustableLane()], { jackpotCounter: 0 });
+
+      // JP判定の出目を用意していないので、振ったら「出目を使い切った」で落ちる
+      const result = resolveInsertionRound(
+        state,
+        [{ laneIndex: 0, handIndexes: [0] }],
+        scriptedRng([6])
+      );
+
+      expect(result.jackpot).toBeNull();
+    });
+
+    it("横穴が出なければ JP判定は行わない", () => {
+      const state = buildState([1], [bustableLane()], { jackpotCounter: 5 });
+
+      const result = resolveInsertionRound(
+        state,
+        [{ laneIndex: 0, handIndexes: [0] }],
+        scriptedRng([5])
+      );
+
+      expect(result.jackpot).toBeNull();
+    });
+  });
+
   it("元の状態を変更しない", () => {
     const state = buildState([2], [{ stock: [coin(3)], pending: faceDown([coin(1)]) }]);
 

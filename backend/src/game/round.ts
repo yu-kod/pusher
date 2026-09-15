@@ -13,6 +13,7 @@
  * 返すだけにとどめる。実際に続ける／やめるを選ぶのは呼び出し側（#12 / #14）。
  */
 import type { Card } from "./deck.js";
+import { applySideHole, canRollJackpot, rollJackpot } from "./jackpot.js";
 import { collectFallenCards, resolvePush } from "./push.js";
 import type { Rng } from "./rng.js";
 import type { GameState } from "./setup.js";
@@ -31,12 +32,27 @@ export type LaneRoundResult = {
   fallenCards: Card[];
 };
 
+/** 横穴をきっかけに行った JP判定の結果（docs/spec.md §5） */
+export type RoundJackpotResult = {
+  roll: number;
+  won: boolean;
+  wonPoints: number;
+};
+
 export type InsertionRoundResult = {
   state: GameState;
   /** レーンごとの結果。**左から順**に並ぶ（docs/spec.md §3 の解決順） */
   lanes: LaneRoundResult[];
-  /** このラウンドで未確定得点に積み上がった点数 */
+  /**
+   * このラウンドで未確定得点に積み上がった点数。
+   *
+   * 横穴が出た場合、この点数もジャックポットへ移っている（手元には残らない）。
+   */
   gainedPoints: number;
+  /** 横穴が出たか。出ていたら手番は即座に終了する（docs/spec.md §5） */
+  busted: boolean;
+  /** 横穴でカウンターが閾値に達し、JP判定を行った場合のみ入る */
+  jackpot: RoundJackpotResult | null;
 };
 
 /**
@@ -46,6 +62,10 @@ export type InsertionRoundResult = {
  * - レーンごとに独立して判定し、成功（と横穴）は §4 の押し出しを解決する
  * - 失敗したレーンでは投入カードが裏向きのまま滞留に残る
  * - 落ちたカードの点数は**未確定得点**に積み上がる。まだ手番プレイヤーの得点にはならない
+ * - 横穴が出たら未確定得点はすべてジャックポットへ移り、手番は即座に終了する（§5）
+ *
+ * 同じラウンドで複数のレーンが横穴になっても、横穴は1回として扱う
+ * （docs/spec.md のルール解釈メモ）。
  */
 export function resolveInsertionRound(
   state: GameState,
@@ -71,9 +91,28 @@ export function resolveInsertionRound(
     return { laneIndex, insertedCoins, target, roll, outcome, fallenCards: pushed.fallenCards };
   });
 
+  const gainedPoints = current.pendingPoints - state.pendingPoints;
+
+  const busted = lanes.some((lane) => lane.outcome === "sideHole");
+  if (!busted) {
+    return { state: current, lanes, gainedPoints, busted, jackpot: null };
+  }
+
+  // §5 横穴 — 未確定得点がすべてジャックポットへ移り、カウンターが1つ進む。
+  // 複数レーンが横穴でも1回だけ適用する（docs/spec.md のルール解釈メモ）
+  current = applySideHole(current);
+
+  // §5 ジャックポットチャンス — カウンターが閾値に達していれば即座に JP判定
+  if (!canRollJackpot(current)) {
+    return { state: current, lanes, gainedPoints, busted, jackpot: null };
+  }
+
+  const { state: afterJackpot, roll, won, wonPoints } = rollJackpot(current, rng);
   return {
-    state: current,
+    state: afterJackpot,
     lanes,
-    gainedPoints: current.pendingPoints - state.pendingPoints,
+    gainedPoints,
+    busted,
+    jackpot: { roll, won, wonPoints },
   };
 }
