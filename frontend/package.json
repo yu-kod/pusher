@@ -1,5 +1,5 @@
 {
-  "name": "pusher-frontend",
+  "name": "pusher-table-frontend",
   "private": true,
   "type": "module",
   "scripts": {

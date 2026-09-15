@@ -17,8 +17,8 @@
 #   # CloudShell を開く（画面右上のターミナルアイコン）
 #   curl -fsSLo tf.zip https://releases.hashicorp.com/terraform/1.9.8/terraform_1.9.8_linux_amd64.zip
 #   unzip tf.zip && mkdir -p ~/bin && mv terraform ~/bin/ && export PATH=$HOME/bin:$PATH
-#   git clone https://github.com/yu-kod/pusher.git
-#   cd pusher/infra/bootstrap
+#   git clone https://github.com/yu-kod/pusher-table.git
+#   cd pusher-table/infra/bootstrap
 #   terraform init && terraform apply
 #
 # apply 後、出力された github_actions_role_arn を GitHub の
@@ -54,13 +54,13 @@ variable "aws_region" {
 variable "project_name" {
   description = "リソース名の接頭辞"
   type        = string
-  default     = "pusher"
+  default     = "pusher-table"
 }
 
 variable "github_repo" {
   description = "このロールを引き受けられる GitHub リポジトリ（owner/repo）"
   type        = string
-  default     = "yu-kod/pusher"
+  default     = "yu-kod/pusher-table"
 }
 
 variable "extra_assume_role_subs" {
@@ -72,16 +72,17 @@ variable "extra_assume_role_subs" {
     ID 付きの形式になることがある。通常形式だけを許可していると
     "Not authorized to perform sts:AssumeRoleWithWebIdentity" で引き受けに失敗する。
 
-    既定値は yu-kod/pusher の ID 付き形式（owner id 48035533 / repo id 1370943501）。
+    既定値は yu-kod/pusher-table の ID 付き形式（owner id 48035533 / repo id 1370943501）。
+    リポジトリをリネームしても repo id は変わらないため、名前の部分だけが変わる。
     同じ問題は yu-kod/pop-art-trick でも発生しており、CloudTrail で実際の sub が
     確認されている。
 
     ワイルドカードを広げる（例: repo:yu-kod*/pusher*:*）と
-    yu-kod-foo/pusher-bar のような別リポジトリまで引き受けられてしまうため、
+    yu-kod-foo/pusher-table-bar のような別リポジトリまで引き受けられてしまうため、
     ID を明示したパターンだけを並べる。
   DESC
   type        = list(string)
-  default     = ["repo:yu-kod@48035533/pusher@1370943501:*"]
+  default     = ["repo:yu-kod@48035533/pusher-table@1370943501:*"]
 }
 
 variable "create_github_oidc_provider" {

@@ -83,8 +83,8 @@ export TF_DATA_DIR=/tmp/tfdata
 
 # リポジトリは $HOME に置く。apply が途中で失敗したときに
 # terraform.tfstate を残して再開できるようにするため
-git clone https://github.com/yu-kod/pusher.git ~/pusher
-cd ~/pusher/infra/bootstrap
+git clone https://github.com/yu-kod/pusher-table.git ~/pusher-table
+cd ~/pusher-table/infra/bootstrap
 
 terraform init
 
@@ -117,9 +117,9 @@ Provider with url https://token.actions.githubusercontent.com already exists.
 apply が終わると3つの値が出力される。
 
 ```
-github_actions_role_arn = "arn:aws:iam::123456789012:role/pusher-github-actions"
-tfstate_bucket          = "pusher-tfstate"
-tfstate_lock_table      = "pusher-tfstate-lock"
+github_actions_role_arn = "arn:aws:iam::123456789012:role/pusher-table-github-actions"
+tfstate_bucket          = "pusher-table-tfstate"
+tfstate_lock_table      = "pusher-table-tfstate-lock"
 ```
 
 このディレクトリに残る `terraform.tfstate` は捨ててよい。作られるリソースは `prevent_destroy` 済みで、以後この構成を変えることはほぼない。
@@ -171,20 +171,20 @@ GitHub が発行する OIDC トークンの `sub` が通常形式ではなく
 `infra/bootstrap/main.tf` の `extra_assume_role_subs` に、この形式のパターンを入れてある。
 
 ```hcl
-default = ["repo:yu-kod@48035533/pusher@1370943501:*"]
+default = ["repo:yu-kod@48035533/pusher-table@1370943501:*"]
 ```
 
 これでも通らない場合は、CloudTrail で `AssumeRoleWithWebIdentity` の実際の `sub` を確認し、
 この変数に追加して再 apply する。
 
 ```bash
-cd ~/pusher && git pull
+cd ~/pusher-table && git pull
 cd infra/bootstrap
 terraform apply -var create_github_oidc_provider=false
 ```
 
-**ワイルドカードを広げて対処しないこと。** `repo:yu-kod*/pusher*:*` のようなパターンは
-`yu-kod-foo/pusher-bar` のような別リポジトリまで引き受けられてしまう。ID を明示したパターンを並べる。
+**ワイルドカードを広げて対処しないこと。** `repo:yu-kod*/pusher-table*:*` のようなパターンは
+`yu-kod-foo/pusher-table-bar` のような別リポジトリまで引き受けられてしまう。ID を明示したパターンを並べる。
 
 ID は以下で確認できる。
 
@@ -192,7 +192,7 @@ ID は以下で確認できる。
 # owner id
 curl -s https://api.github.com/users/yu-kod | grep '"id"'
 # repo id
-curl -s https://api.github.com/repos/yu-kod/pusher | grep '"id"'
+curl -s https://api.github.com/repos/yu-kod/pusher-table | grep '"id"'
 ```
 
 ### Terraform のロックが残った
