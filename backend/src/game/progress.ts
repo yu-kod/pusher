@@ -30,8 +30,8 @@ export function endTurn(state: GameState): EndTurnResult {
 
   return {
     state: { ...banked, currentPlayerIndex: nextIndex },
-    // 先頭へ戻ったなら全員が1回ずつ手番を終えている
-    roundEnded: nextIndex === 0,
+    // スタートプレイヤーへ戻ったなら全員が1回ずつ手番を終えている
+    roundEnded: nextIndex === banked.startPlayerIndex,
   };
 }
 
@@ -55,7 +55,7 @@ export type EndRoundResult = {
  * - 各プレイヤーが山札から `config.roundDrawCount` 枚ドローする。手札に上限はない
  * - 引いたイベントカードはその場で解決して捨て札にする。手札には入れない（§6）
  * - 各レーンへ `config.roundLaneRefillCount` 枚補充する（既定は 0。§4-3）
- * - ラウンド番号を1つ進める
+ * - ラウンド番号を1つ進め、スタートプレイヤーを次のプレイヤーへ回す（§3）
  *
  * 山札が尽きたら捨て札をシャッフルして山札とする。それでも足りなければ
  * あるぶんだけ引き、`deckExhausted` で知らせる（docs/spec.md のルール解釈メモ）。
@@ -108,6 +108,11 @@ export function endRound(
     stock: [...lane.stock, ...drawCards(state.config.roundLaneRefillCount)],
   }));
 
+  // §3 スタートプレイヤーの交代。後の手番ほど厚い滞留に当たりやすい偏りを均す（#54）
+  const startPlayerIndex = state.config.rotateStartPlayer
+    ? (state.startPlayerIndex + 1) % state.players.length
+    : state.startPlayerIndex;
+
   let next: GameState = {
     ...state,
     players: drawn.map((d) => d.player),
@@ -115,6 +120,8 @@ export function endRound(
     drawPile,
     discardPile,
     round: state.round + 1,
+    startPlayerIndex,
+    currentPlayerIndex: startPlayerIndex,
   };
 
   // 引いたイベントを、引いた本人のものとして解決する（docs/spec.md のルール解釈メモ）。
