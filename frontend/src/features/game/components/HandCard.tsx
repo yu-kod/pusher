@@ -1,3 +1,5 @@
+import { PlayingCard } from "./PlayingCard";
+import { cardLabel } from "@/lib/cards";
 import type { Card } from "@/lib/types";
 
 type Props = {
@@ -7,7 +9,11 @@ type Props = {
   onSelect: () => void;
 };
 
-/** 手札の1枚。イベントカードは投入できないので選べない（docs/spec.md ルール解釈メモ） */
+/**
+ * 手札の1枚。手に持っている感じを出すため、選んだ札は持ち上がる。
+ *
+ * イベントカードは投入できないので選べない（docs/spec.md ルール解釈メモ）。
+ */
 export function HandCard({ card, selected, disabled, onSelect }: Props) {
   const playable = card.kind === "coin";
 
@@ -17,19 +23,12 @@ export function HandCard({ card, selected, disabled, onSelect }: Props) {
       onClick={onSelect}
       disabled={disabled || !playable}
       aria-pressed={selected}
-      aria-label={playable ? `${card.coins}コイン札` : `イベント: ${card.event}`}
-      className={`flex h-20 w-14 flex-col items-center justify-center rounded border-2 ${
-        selected ? "border-gray-900 bg-gray-900 text-white" : "border-gray-300"
-      } disabled:opacity-40`}
+      aria-label={cardLabel(card)}
+      className={`relative rounded-md transition-transform duration-150 ${
+        selected ? "z-10 -translate-y-3 ring-2 ring-amber-300" : "hover:-translate-y-1"
+      } disabled:opacity-40 disabled:hover:translate-y-0`}
     >
-      {playable ? (
-        <>
-          <span className="text-2xl font-bold">{card.coins}</span>
-          <span className="text-[10px]">コイン</span>
-        </>
-      ) : (
-        <span className="text-[10px]">イベント</span>
-      )}
+      <PlayingCard faceUp card={card} />
     </button>
   );
 }

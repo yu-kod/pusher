@@ -18,9 +18,11 @@ export function LobbyPage() {
 
   if (room === null) {
     return (
-      <main className="mx-auto max-w-md p-6">
-        <ErrorMessage message={error} />
-        {error === null && <p className="text-gray-600">読み込み中…</p>}
+      <main className="table-felt min-h-dvh px-6 py-10 text-emerald-50">
+        <div className="mx-auto max-w-md">
+          <ErrorMessage message={error} />
+          {error === null && <p className="text-emerald-50/70">読み込み中…</p>}
+        </div>
       </main>
     );
   }
@@ -77,27 +79,29 @@ function JoinForm({ code, onJoined }: JoinFormProps) {
   };
 
   return (
-    <main className="mx-auto max-w-md p-6">
-      <h1 className="text-2xl font-bold">ルーム {code} に参加</h1>
-      <form onSubmit={onSubmit} className="mt-6 space-y-2">
-        <label htmlFor="join-name" className="block text-sm font-medium">
-          表示名
-        </label>
-        <input
-          id="join-name"
-          value={name}
-          onChange={(event) => setName(event.target.value)}
-          maxLength={20}
-          className="w-full rounded border border-gray-300 px-3 py-2"
-        />
-        <ErrorMessage message={error} />
-        <button
-          type="submit"
-          className="w-full rounded bg-gray-900 px-4 py-3 font-medium text-white"
-        >
-          参加する
-        </button>
-      </form>
+    <main className="table-felt min-h-dvh px-6 py-10 text-emerald-50">
+      <div className="mx-auto max-w-md">
+        <h1 className="text-2xl font-bold text-amber-200">ルーム {code} に参加</h1>
+        <form onSubmit={onSubmit} className="mt-6 space-y-2">
+          <label htmlFor="join-name" className="block text-sm font-medium">
+            表示名
+          </label>
+          <input
+            id="join-name"
+            value={name}
+            onChange={(event) => setName(event.target.value)}
+            maxLength={20}
+            className="w-full rounded border border-white/20 bg-black/25 px-3 py-2 text-emerald-50"
+          />
+          <ErrorMessage message={error} />
+          <button
+            type="submit"
+            className="w-full rounded-lg bg-amber-400 px-4 py-3 font-bold text-amber-950 shadow-[0_3px_0_#92400e] active:translate-y-0.5"
+          >
+            参加する
+          </button>
+        </form>
+      </div>
     </main>
   );
 }
@@ -142,69 +146,73 @@ function Lobby({ code, room, credentials, error, setError, reload }: LobbyProps)
   };
 
   return (
-    <main className="mx-auto max-w-md p-6">
-      <h1 className="text-sm font-medium text-gray-600">ルームコード</h1>
-      <p className="font-mono text-4xl font-bold tracking-widest">{code}</p>
-
-      <button
-        type="button"
-        onClick={copyInvite}
-        className="mt-3 rounded border border-gray-300 px-3 py-1.5 text-sm"
-      >
-        {copied ? "コピーしました" : "招待URLをコピー"}
-      </button>
-
-      <h2 className="mt-8 text-sm font-medium text-gray-600">
-        参加者 {room.players.length} / {MAX_PLAYERS}
-      </h2>
-      <ul className="mt-2 divide-y divide-gray-200 rounded border border-gray-200">
-        {room.players.map((player) => (
-          <li key={player.id} className="flex items-center justify-between px-3 py-2">
-            <span>
-              {player.name}
-              {player.id === credentials.playerId && (
-                <span className="ml-2 text-xs text-gray-500">（あなた）</span>
-              )}
-              {player.isCpu && <span className="ml-2 text-xs text-gray-500">CPU</span>}
-            </span>
-            {player.isCpu && (
-              <button
-                type="button"
-                onClick={() => run(() => removeCpu(code, player.id, credentials.token))}
-                className="text-sm text-red-700"
-                aria-label={`${player.name} を外す`}
-              >
-                外す
-              </button>
-            )}
-          </li>
-        ))}
-      </ul>
-
-      <button
-        type="button"
-        disabled={isFull}
-        onClick={() => run(() => joinRoom(code, `CPU${room.players.length}`, true))}
-        className="mt-3 w-full rounded border border-gray-300 px-4 py-2 text-sm disabled:opacity-50"
-      >
-        CPU を追加
-      </button>
-
-      <ErrorMessage message={error} />
-
-      <button
-        type="button"
-        disabled={!canStart}
-        onClick={() => run(() => startGame(code, credentials.token))}
-        className="mt-8 w-full rounded bg-gray-900 px-4 py-3 font-medium text-white disabled:opacity-50"
-      >
-        ゲームを開始
-      </button>
-      {!canStart && (
-        <p className="mt-2 text-center text-sm text-gray-500">
-          {MIN_PLAYERS}〜{MAX_PLAYERS}人で開始できます
+    <main className="table-felt min-h-dvh px-6 py-10 text-emerald-50">
+      <div className="mx-auto max-w-md">
+        <h1 className="text-xs font-medium tracking-wider text-emerald-50/60">ルームコード</h1>
+        <p className="mt-1 inline-block rounded-lg bg-black/35 px-4 py-2 font-mono text-4xl font-bold tracking-widest text-amber-200">
+          {code}
         </p>
-      )}
+
+        <button
+          type="button"
+          onClick={copyInvite}
+          className="mt-3 block rounded border border-white/25 px-3 py-1.5 text-sm"
+        >
+          {copied ? "コピーしました" : "招待URLをコピー"}
+        </button>
+
+        <h2 className="mt-8 text-xs font-medium tracking-wider text-emerald-50/60">
+          参加者 {room.players.length} / {MAX_PLAYERS}
+        </h2>
+        <ul className="mt-2 divide-y divide-white/10 overflow-hidden rounded-lg bg-black/25">
+          {room.players.map((player) => (
+            <li key={player.id} className="flex items-center justify-between px-3 py-2">
+              <span>
+                {player.name}
+                {player.id === credentials.playerId && (
+                  <span className="ml-2 text-xs text-emerald-50/50">（あなた）</span>
+                )}
+                {player.isCpu && <span className="ml-2 text-xs text-emerald-50/50">CPU</span>}
+              </span>
+              {player.isCpu && (
+                <button
+                  type="button"
+                  onClick={() => run(() => removeCpu(code, player.id, credentials.token))}
+                  className="text-sm text-red-300"
+                  aria-label={`${player.name} を外す`}
+                >
+                  外す
+                </button>
+              )}
+            </li>
+          ))}
+        </ul>
+
+        <button
+          type="button"
+          disabled={isFull}
+          onClick={() => run(() => joinRoom(code, `CPU${room.players.length}`, true))}
+          className="mt-3 w-full rounded-lg border border-white/25 px-4 py-2 text-sm disabled:opacity-50"
+        >
+          CPU を追加
+        </button>
+
+        <ErrorMessage message={error} />
+
+        <button
+          type="button"
+          disabled={!canStart}
+          onClick={() => run(() => startGame(code, credentials.token))}
+          className="mt-8 w-full rounded-lg bg-amber-400 px-4 py-3 font-bold text-amber-950 shadow-[0_3px_0_#92400e] active:translate-y-0.5 active:shadow-[0_1px_0_#92400e] disabled:opacity-50"
+        >
+          ゲームを開始
+        </button>
+        {!canStart && (
+          <p className="mt-2 text-center text-sm text-emerald-50/60">
+            {MIN_PLAYERS}〜{MAX_PLAYERS}人で開始できます
+          </p>
+        )}
+      </div>
     </main>
   );
 }
