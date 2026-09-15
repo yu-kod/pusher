@@ -228,26 +228,25 @@ describe("プリセットがエンジンの挙動を変える", () => {
     const { setupGame } = await import("./setup.js");
     const { createRng } = await import("./rng.js");
     const { rollJackpot } = await import("./jackpot.js");
-    const { coin } = await import("../test-utils/cards.js");
 
     const alwaysSix = { rollD6: () => 6 };
     const build = (balance: Balance) => {
       const base = setupGame(["A", "B", "C"], createRng(1), balance);
       return {
         ...base,
-        players: base.players.map((p) => ({ ...p, hand: [] })),
-        jackpotPool: [coin(1), coin(2), coin(3), coin(1)],
+        players: base.players.map((p) => ({ ...p, points: 0 })),
+        jackpotPoints: 8,
         jackpotCounter: balance.jackpotThreshold,
       };
     };
 
     const full = rollJackpot(build(DEFAULT_BALANCE), alwaysSix);
-    expect(full.wonCards).toHaveLength(4);
-    expect(full.state.jackpotPool).toEqual([]);
+    expect(full.wonPoints).toBe(8);
+    expect(full.state.jackpotPoints).toBe(0);
 
     const half = rollJackpot(build(withPreset("jackpotHalfCarryOver")), alwaysSix);
-    expect(half.wonCards).toHaveLength(2);
-    expect(half.state.jackpotPool).toHaveLength(2);
+    expect(half.wonPoints).toBe(4);
+    expect(half.state.jackpotPoints).toBe(4);
   });
 
   it("handLimit7 を適用すると上限が 7 枚になる（既定は無制限）", () => {

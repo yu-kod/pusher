@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import { coin, faceDown, faceUp } from "../test-utils/cards.js";
-import type { Card } from "./deck.js";
 import { createRng, type Rng } from "./rng.js";
 import { DEFAULT_BALANCE } from "./balance.js";
 import { setupGame, type GameState, type Lane } from "./setup.js";
@@ -23,7 +22,7 @@ function buildState(lanes: Partial<Lane>[], overrides?: Partial<GameState>): Gam
   const base = setupGame(["A", "B", "C"], createRng(1), DEFAULT_BALANCE);
   return {
     ...base,
-    players: base.players.map((p) => ({ ...p, hand: [] })),
+    players: base.players.map((p) => ({ ...p, hand: [], points: 0 })),
     lanes: base.lanes.map((lane, i) => ({
       ...lane,
       stock: [],
@@ -32,7 +31,8 @@ function buildState(lanes: Partial<Lane>[], overrides?: Partial<GameState>): Gam
       ...lanes[i],
     })),
     drawPile: [],
-    jackpotPool: [],
+    jackpotPoints: 0,
+    pendingPoints: 0,
     jackpotCounter: 0,
     ...overrides,
   };
@@ -114,13 +114,14 @@ describe("resolveOpenLane（横穴開放）", () => {
     expect(result.state.lanes[0]?.pending.every((p) => p.faceUp)).toBe(true);
   });
 
-  it("選んだ1枚を獲得する", () => {
+  it("選んだ1枚を点数にし、カードは山札へ戻す（docs/spec.md §6）", () => {
     const state = buildState([{ pending: faceDown([coin(1), coin(2), coin(3)]) }, {}, {}]);
 
     const result = resolveOpenLane(state, 0, 1);
 
     expect(result.takenCard).toEqual(coin(2));
-    expect(result.state.players[0]?.hand).toEqual([coin(2)]);
+    expect(result.state.pendingPoints).toBe(2);
+    expect(result.state.drawPile).toEqual([coin(2)]);
   });
 
   it("残りは表向きのまま滞留する", () => {
@@ -143,7 +144,7 @@ describe("resolveOpenLane（横穴開放）", () => {
     const result = resolveOpenLane(state, 0, 0);
 
     expect(result.takenCard).toBeNull();
-    expect(result.state.players[0]?.hand).toEqual([]);
+    expect(result.state.pendingPoints).toBe(0);
   });
 
   it("他のレーンは表向きにならない", () => {
@@ -227,14 +228,14 @@ describe("resolveLottery（抽選抽選）", () => {
   });
 
   it("即座に JP判定を1回行う（docs/spec.md §6）", () => {
-    const pool: Card[] = [coin(3), coin(2)];
-    const state = buildState([{}, {}, {}], { jackpotCounter: 3, jackpotPool: pool });
+    const state = buildState([{}, {}, {}], { jackpotCounter: 3, jackpotPoints: 5 });
 
     const result = resolveLottery(state, scriptedRng([6]));
 
     expect(result.jackpotRoll).toBe(6);
     expect(result.jackpotWon).toBe(true);
-    expect(result.state.players[0]?.hand).toEqual(pool);
+    expect(result.wonPoints).toBe(5);
+    expect(result.state.players[0]?.points).toBe(5);
   });
 
   it("外れてもカウンターは戻らない（docs/spec.md §6）", () => {
@@ -243,17 +244,18 @@ describe("resolveLottery（抽選抽選）", () => {
     const result = resolveLottery(state, scriptedRng([2]));
 
     expect(result.jackpotWon).toBe(false);
+    expect(result.wonPoints).toBe(0);
     expect(result.state.jackpotCounter).toBe(3);
   });
 
   it("カウンターが閾値未満でも JP判定を行う（docs/spec.md §6）", () => {
-    const state = buildState([{}, {}, {}], { jackpotCounter: 0, jackpotPool: [coin(1)] });
+    const state = buildState([{}, {}, {}], { jackpotCounter: 0, jackpotPoints: 1 });
 
     const result = resolveLottery(state, scriptedRng([6]));
 
     expect(result.state.jackpotCounter).toBe(0);
     expect(result.jackpotWon).toBe(true);
-    expect(result.state.players[0]?.hand).toEqual([coin(1)]);
+    expect(result.state.players[0]?.points).toBe(1);
   });
 
   it("元の状態を変更しない", () => {
