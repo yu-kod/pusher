@@ -63,6 +63,27 @@ variable "github_repo" {
   default     = "yu-kod/pusher"
 }
 
+variable "extra_assume_role_subs" {
+  description = <<-DESC
+    信頼ポリシーで追加で許可する sub クレームのパターン。
+
+    リポジトリや owner を過去にリネームしていると、GitHub が発行する OIDC トークンの
+    sub クレームが通常形式ではなく `repo:owner@ownerId/repo@repoId:...` という
+    ID 付きの形式になることがある。通常形式だけを許可していると
+    "Not authorized to perform sts:AssumeRoleWithWebIdentity" で引き受けに失敗する。
+
+    既定値は yu-kod/pusher の ID 付き形式（owner id 48035533 / repo id 1370943501）。
+    同じ問題は yu-kod/pop-art-trick でも発生しており、CloudTrail で実際の sub が
+    確認されている。
+
+    ワイルドカードを広げる（例: repo:yu-kod*/pusher*:*）と
+    yu-kod-foo/pusher-bar のような別リポジトリまで引き受けられてしまうため、
+    ID を明示したパターンだけを並べる。
+  DESC
+  type        = list(string)
+  default     = ["repo:yu-kod@48035533/pusher@1370943501:*"]
+}
+
 variable "create_github_oidc_provider" {
   description = <<-DESC
     GitHub Actions 用の OIDC プロバイダーを作るか。
@@ -168,13 +189,11 @@ resource "aws_iam_role" "github_actions" {
         }
         StringLike = {
           # このリポジトリのどのブランチ・タグからでも引き受けられる。
-          #
-          # なお、リポジトリや owner を過去にリネームしていると、OIDC トークンの
-          # sub クレームが `repo:owner@ownerId/repo@repoId:...` という ID 付きの
-          # 形式で発行されることがある。その場合ここにマッチせず
-          # "Not authorized to perform sts:AssumeRoleWithWebIdentity" になるため、
-          # CloudTrail で実際の sub を確認してこのリストに追加する。
-          "token.actions.githubusercontent.com:sub" = ["repo:${var.github_repo}:*"]
+          # ID 付き形式の sub については extra_assume_role_subs のコメントを参照。
+          "token.actions.githubusercontent.com:sub" = concat(
+            ["repo:${var.github_repo}:*"],
+            var.extra_assume_role_subs,
+          )
         }
       }
     }]

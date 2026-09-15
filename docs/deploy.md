@@ -159,13 +159,41 @@ hosted_zone_name = "example.com"
 
 ## 困ったとき
 
-### `Not authorized to perform sts:AssumeRoleWithWebIdentity`
+### デプロイが `Assuming role with OIDC` を繰り返して進まない
 
-リポジトリや owner を過去にリネームしていると、OIDC トークンの `sub` クレームが
-`repo:owner@ownerId/repo@repoId:...` という ID 付きの形式で発行されることがある。
+`Configure AWS credentials` のステップが `Assuming role with OIDC` を何度も出して止まる場合、
+ロールの引き受けに失敗してリトライしている。
 
-CloudTrail で実際の `sub` を確認し、`infra/bootstrap/main.tf` の
-`token.actions.githubusercontent.com:sub` のリストに追加する。
+原因として多いのは、**`sub` クレームの形式**。リポジトリや owner を過去にリネームしていると、
+GitHub が発行する OIDC トークンの `sub` が通常形式ではなく
+`repo:owner@ownerId/repo@repoId:...` という **ID 付きの形式**になることがある。
+
+`infra/bootstrap/main.tf` の `extra_assume_role_subs` に、この形式のパターンを入れてある。
+
+```hcl
+default = ["repo:yu-kod@48035533/pusher@1370943501:*"]
+```
+
+これでも通らない場合は、CloudTrail で `AssumeRoleWithWebIdentity` の実際の `sub` を確認し、
+この変数に追加して再 apply する。
+
+```bash
+cd ~/pusher && git pull
+cd infra/bootstrap
+terraform apply -var create_github_oidc_provider=false
+```
+
+**ワイルドカードを広げて対処しないこと。** `repo:yu-kod*/pusher*:*` のようなパターンは
+`yu-kod-foo/pusher-bar` のような別リポジトリまで引き受けられてしまう。ID を明示したパターンを並べる。
+
+ID は以下で確認できる。
+
+```bash
+# owner id
+curl -s https://api.github.com/users/yu-kod | grep '"id"'
+# repo id
+curl -s https://api.github.com/repos/yu-kod/pusher | grep '"id"'
+```
 
 ### Terraform のロックが残った
 
