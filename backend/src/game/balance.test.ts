@@ -13,9 +13,9 @@ describe("DEFAULT_BALANCE", () => {
     expect(DEFAULT_BALANCE.laneCount).toBe(3);
     expect(DEFAULT_BALANCE.initialLaneCards).toBe(5);
     expect(DEFAULT_BALANCE.initialHandSize).toBe(5);
-    expect(DEFAULT_BALANCE.maxRounds).toBe(12);
+    expect(DEFAULT_BALANCE.maxRounds).toBe(13);
     expect(DEFAULT_BALANCE.jackpotThreshold).toBe(5);
-    expect(DEFAULT_BALANCE.roundDrawCount).toBe(2);
+    expect(DEFAULT_BALANCE.roundDrawCount).toBe(3);
     expect(DEFAULT_BALANCE.roundLaneRefillCount).toBe(0);
     expect(DEFAULT_BALANCE.handLimit).toBeNull();
   });
@@ -38,8 +38,8 @@ describe("DEFAULT_BALANCE", () => {
 
 describe("withPreset", () => {
   it("プリセットを適用した Balance を返す", () => {
-    expect(withPreset("lanes3").laneCount).toBe(3);
     expect(withPreset("lanes4").laneCount).toBe(4);
+    expect(withPreset("roundDraw2").roundDrawCount).toBe(2);
   });
 
   it("元の DEFAULT_BALANCE を変更しない", () => {
@@ -49,21 +49,21 @@ describe("withPreset", () => {
   });
 
   it("指定しなかった値は既定のまま残る", () => {
-    const balance = withPreset("lanes3");
+    const balance = withPreset("lanes4");
 
     expect(balance.maxRounds).toBe(DEFAULT_BALANCE.maxRounds);
     expect(balance.deck).toEqual(DEFAULT_BALANCE.deck);
   });
 
   it("複数のプリセットを重ねられる", () => {
-    const balance = withPreset("lanes3", "noRoundDraw");
+    const balance = withPreset("lanes4", "noRoundDraw");
 
-    expect(balance.laneCount).toBe(3);
+    expect(balance.laneCount).toBe(4);
     expect(balance.roundDrawCount).toBe(0);
   });
 
   it("後のプリセットが先のプリセットを上書きする", () => {
-    expect(withPreset("lanes3", "lanes4").laneCount).toBe(4);
+    expect(withPreset("roundDraw1", "roundDraw2").roundDrawCount).toBe(2);
   });
 
   it("プリセットを渡さなければ既定値を返す", () => {
@@ -77,7 +77,6 @@ describe("BALANCE_PRESETS（docs/spec.md §7 の検証項目）", () => {
   it("§7 の検証項目に対応するプリセットが揃っている", () => {
     expect(names).toEqual(
       expect.arrayContaining([
-        "lanes3",
         "lanes4",
         "coin3Ratio25",
         "noRoundDraw",
@@ -99,8 +98,8 @@ describe("BALANCE_PRESETS（docs/spec.md §7 の検証項目）", () => {
   });
 
   describe("レーン本数（§7 次点）", () => {
-    it("lanes3 はレーンを3本にする", () => {
-      expect(withPreset("lanes3").laneCount).toBe(3);
+    it("lanes4 はレーンを4本にする", () => {
+      expect(withPreset("lanes4").laneCount).toBe(4);
     });
   });
 
@@ -158,13 +157,23 @@ describe("BALANCE_PRESETS（docs/spec.md §7 の検証項目）", () => {
     });
   });
 
-  describe("投入できるレーン数（#39）", () => {
-    it("既定は全レーンへ1枚ずつ投入できる", () => {
-      expect(DEFAULT_BALANCE.maxLanesPerRound).toBe(DEFAULT_BALANCE.laneCount);
+  describe("投入できるレーン数（#55）", () => {
+    it("既定は1投入ラウンドにつき1レーン", () => {
+      expect(DEFAULT_BALANCE.maxLanesPerRound).toBe(1);
     });
 
-    it("singleLane は1手番に1レーンだけに制限する（変更前のルール）", () => {
-      expect(withPreset("singleLane").maxLanesPerRound).toBe(1);
+    it("multiLane は全レーンへ1枚ずつ投入できるようにする（#55 以前のルール）", () => {
+      expect(withPreset("multiLane").maxLanesPerRound).toBe(DEFAULT_BALANCE.laneCount);
+    });
+  });
+
+  describe("ラウンドのドロー枚数（#55）", () => {
+    it("既定は3枚", () => {
+      expect(DEFAULT_BALANCE.roundDrawCount).toBe(3);
+    });
+
+    it("roundDraw2 は #55 以前の2枚に戻す", () => {
+      expect(withPreset("roundDraw2").roundDrawCount).toBe(2);
     });
   });
 });
