@@ -14,7 +14,8 @@
  */
 import type { Card } from "./deck.js";
 import { applySideHole, canRollJackpot, rollJackpot } from "./jackpot.js";
-import { collectFallenCards, resolvePush } from "./push.js";
+import { resolvePush } from "./push.js";
+import { collectAndResolveFall, type EventChooser, type ResolvedEvent } from "./resolve.js";
 import type { Rng } from "./rng.js";
 import type { GameState } from "./setup.js";
 import { classifyRoll, insertIntoLanes, type LaneInsertion, type RollOutcome } from "./turn.js";
@@ -53,6 +54,8 @@ export type InsertionRoundResult = {
   busted: boolean;
   /** 横穴でカウンターが閾値に達し、JP判定を行った場合のみ入る */
   jackpot: RoundJackpotResult | null;
+  /** 落ちたカードに含まれていたイベントの解決結果（§6）。連鎖した順に並ぶ */
+  events: ResolvedEvent[];
   /**
    * もう一度投入ラウンドを行えるか（docs/spec.md §3）。
    *
@@ -97,6 +100,7 @@ function canContinueTurn(state: GameState): boolean {
 export function resolveInsertionRound(
   state: GameState,
   insertions: readonly LaneInsertion[],
+  chooser: EventChooser,
   rng: Pick<Rng, "rollD6">
 ): InsertionRoundResult {
   const inserted = insertIntoLanes(state, insertions);
@@ -106,6 +110,7 @@ export function resolveInsertionRound(
 
   // §3 手順4: レーン順（左から）に解決する
   let current = inserted.state;
+  const events: ResolvedEvent[] = [];
   const lanes = rolled.map(({ laneIndex, insertedCoins, target, roll }): LaneRoundResult => {
     const outcome = classifyRoll(roll, target);
     if (outcome === "failure") {
@@ -114,7 +119,16 @@ export function resolveInsertionRound(
     }
 
     const pushed = resolvePush(current, laneIndex, insertedCoins);
-    current = collectFallenCards(pushed.state, pushed.fallenCards);
+    // 落下カードを点数にし、イベントが混じっていれば §6 を適用する
+    const resolved = collectAndResolveFall(
+      pushed.state,
+      laneIndex,
+      pushed.fallenCards,
+      chooser,
+      rng
+    );
+    current = resolved.state;
+    events.push(...resolved.events);
     return { laneIndex, insertedCoins, target, roll, outcome, fallenCards: pushed.fallenCards };
   });
 
@@ -129,6 +143,7 @@ export function resolveInsertionRound(
       gainedPoints,
       busted,
       jackpot: null,
+      events,
       canContinue: canContinueTurn(current),
     };
   }
@@ -142,7 +157,15 @@ export function resolveInsertionRound(
 
   // §5 ジャックポットチャンス — カウンターが閾値に達していれば即座に JP判定
   if (!canRollJackpot(current)) {
-    return { state: current, lanes, gainedPoints, busted, jackpot: null, canContinue: false };
+    return {
+      state: current,
+      lanes,
+      gainedPoints,
+      busted,
+      jackpot: null,
+      events,
+      canContinue: false,
+    };
   }
 
   const { state: afterJackpot, roll, won, wonPoints } = rollJackpot(current, rng);
@@ -152,6 +175,7 @@ export function resolveInsertionRound(
     gainedPoints,
     busted,
     jackpot: { roll, won, wonPoints },
+    events,
     canContinue: false,
   };
 }

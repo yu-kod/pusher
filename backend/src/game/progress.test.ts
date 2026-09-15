@@ -1,9 +1,18 @@
 import { describe, expect, it } from "vitest";
-import { coin } from "../test-utils/cards.js";
+import { coin, faceDown } from "../test-utils/cards.js";
 import { DEFAULT_BALANCE, withPreset } from "./balance.js";
 import { createRng } from "./rng.js";
 import { setupGame, type GameState } from "./setup.js";
+import type { Card } from "./deck.js";
+import type { EventChooser } from "./resolve.js";
 import { determineWinners, endRound, endTurn } from "./progress.js";
+import { scriptedRng } from "../test-utils/rng.js";
+
+/** レーン0・滞留の先頭を選ぶ chooser */
+const chooser: EventChooser = { chooseLane: () => 0, choosePending: () => 0 };
+
+/** イベントを引かないテスト用。振られたら「出目を使い切った」で落ちる */
+const noRolls = scriptedRng([]);
 
 function buildState(overrides?: Partial<GameState>): GameState {
   const base = setupGame(["A", "B", "C"], createRng(1), DEFAULT_BALANCE);
@@ -100,7 +109,7 @@ describe("endRound（ラウンド終了処理）", () => {
       drawPile: [coin(1), coin(1), coin(2), coin(2), coin(3), coin(3)],
     });
 
-    const result = endRound(state, noShuffle);
+    const result = endRound(state, { ...noRolls, ...noShuffle }, chooser);
 
     expect(result.state.players.map((p) => p.hand)).toEqual([
       [coin(1), coin(1)],
@@ -114,14 +123,18 @@ describe("endRound（ラウンド終了処理）", () => {
     const base = buildState({ drawPile: [coin(1), coin(1), coin(1), coin(1), coin(1), coin(1)] });
     const state = { ...base, players: base.players.map((p) => ({ ...p, hand: [coin(3)] })) };
 
-    expect(endRound(state, noShuffle).state.players[0]?.hand).toEqual([coin(3), coin(1), coin(1)]);
+    expect(endRound(state, { ...noRolls, ...noShuffle }, chooser).state.players[0]?.hand).toEqual([
+      coin(3),
+      coin(1),
+      coin(1),
+    ]);
   });
 
   it("ドロー枚数は config.roundDrawCount で変えられる", () => {
     const base = buildState({ drawPile: [coin(1), coin(1), coin(1)] });
     const state = { ...base, config: withPreset("roundDraw1") };
 
-    const result = endRound(state, noShuffle);
+    const result = endRound(state, { ...noRolls, ...noShuffle }, chooser);
 
     expect(result.state.players.map((p) => p.hand.length)).toEqual([1, 1, 1]);
   });
@@ -129,13 +142,13 @@ describe("endRound（ラウンド終了処理）", () => {
   it("ラウンド番号を1つ進める", () => {
     const state = buildState({ round: 3, drawPile: [] });
 
-    expect(endRound(state, noShuffle).state.round).toBe(4);
+    expect(endRound(state, { ...noRolls, ...noShuffle }, chooser).state.round).toBe(4);
   });
 
   it("レーンへの補充は行わない（docs/spec.md §4-3）", () => {
     const state = buildState({ drawPile: [coin(1), coin(1), coin(1), coin(1), coin(1), coin(1)] });
 
-    const result = endRound(state, noShuffle);
+    const result = endRound(state, { ...noRolls, ...noShuffle }, chooser);
 
     expect(result.state.lanes.map((l) => l.stock.length)).toEqual([0, 0, 0]);
   });
@@ -143,7 +156,7 @@ describe("endRound（ラウンド終了処理）", () => {
   it("元の状態を変更しない", () => {
     const state = buildState({ drawPile: [coin(1), coin(1), coin(1), coin(1), coin(1), coin(1)] });
 
-    endRound(state, noShuffle);
+    endRound(state, { ...noRolls, ...noShuffle }, chooser);
 
     expect(state.players[0]?.hand).toEqual([]);
     expect(state.drawPile).toHaveLength(6);
@@ -156,7 +169,7 @@ describe("endRound（ラウンド終了処理）", () => {
         discardPile: [coin(2), coin(2), coin(2), coin(2), coin(2)],
       });
 
-      const result = endRound(state, noShuffle);
+      const result = endRound(state, { ...noRolls, ...noShuffle }, chooser);
 
       expect(result.state.players[0]?.hand).toEqual([coin(1), coin(2)]);
       expect(result.state.discardPile).toEqual([]);
@@ -166,14 +179,14 @@ describe("endRound（ラウンド終了処理）", () => {
     it("捨て札も尽きたらあるぶんだけ引いて終了を知らせる", () => {
       const state = buildState({ drawPile: [coin(1), coin(1), coin(1)], discardPile: [] });
 
-      const result = endRound(state, noShuffle);
+      const result = endRound(state, { ...noRolls, ...noShuffle }, chooser);
 
       expect(result.state.players.map((p) => p.hand.length)).toEqual([2, 1, 0]);
       expect(result.deckExhausted).toBe(true);
     });
 
     it("山札も捨て札も空なら誰も引けない", () => {
-      const result = endRound(buildState(), noShuffle);
+      const result = endRound(buildState(), { ...noRolls, ...noShuffle }, chooser);
 
       expect(result.state.players.every((p) => p.hand.length === 0)).toBe(true);
       expect(result.deckExhausted).toBe(true);
@@ -188,7 +201,9 @@ describe("endRound（ラウンド終了処理）", () => {
       // 逆順に並べ替える Rng
       const reversing = { shuffle: <T>(items: readonly T[]): T[] => [...items].reverse() };
 
-      expect(endRound(state, reversing).state.players[0]?.hand).toEqual([coin(3), coin(2)]);
+      expect(endRound(state, { ...noRolls, ...reversing }, chooser).state.players[0]?.hand).toEqual(
+        [coin(3), coin(2)]
+      );
     });
   });
 });
@@ -202,7 +217,7 @@ describe("ゲーム終了（docs/spec.md §3）", () => {
   it("最終ラウンドの終了でゲームが終わる", () => {
     const state = buildState({ round: DEFAULT_BALANCE.maxRounds, drawPile: plentyDrawPile() });
 
-    const result = endRound(state, noShuffle);
+    const result = endRound(state, { ...noRolls, ...noShuffle }, chooser);
 
     expect(result.gameOver).toBe(true);
     expect(result.state.phase).toBe("finished");
@@ -211,7 +226,7 @@ describe("ゲーム終了（docs/spec.md §3）", () => {
   it("最終ラウンドまではゲームが続く", () => {
     const state = buildState({ round: DEFAULT_BALANCE.maxRounds - 1, drawPile: plentyDrawPile() });
 
-    const result = endRound(state, noShuffle);
+    const result = endRound(state, { ...noRolls, ...noShuffle }, chooser);
 
     expect(result.gameOver).toBe(false);
     expect(result.state.phase).toBe("playing");
@@ -220,7 +235,7 @@ describe("ゲーム終了（docs/spec.md §3）", () => {
   it("山札も捨て札も尽きたらその時点で終了する", () => {
     const state = buildState({ round: 2, drawPile: [], discardPile: [] });
 
-    const result = endRound(state, noShuffle);
+    const result = endRound(state, { ...noRolls, ...noShuffle }, chooser);
 
     expect(result.deckExhausted).toBe(true);
     expect(result.gameOver).toBe(true);
@@ -236,7 +251,7 @@ describe("ゲーム終了（docs/spec.md §3）", () => {
     });
     const state = { ...base, lastSideHolePlayerId: base.players[1]?.id ?? null };
 
-    const result = endRound(state, noShuffle);
+    const result = endRound(state, { ...noRolls, ...noShuffle }, chooser);
 
     expect(result.state.players[1]?.points).toBe(15);
     expect(result.state.jackpotPoints).toBe(0);
@@ -251,7 +266,7 @@ describe("ゲーム終了（docs/spec.md §3）", () => {
     });
     const state = { ...base, lastSideHolePlayerId: base.players[1]?.id ?? null };
 
-    const result = endRound(state, noShuffle);
+    const result = endRound(state, { ...noRolls, ...noShuffle }, chooser);
 
     expect(result.state.players.every((p) => p.points === 0)).toBe(true);
     expect(result.state.jackpotPoints).toBe(0);
@@ -265,7 +280,7 @@ describe("ゲーム終了（docs/spec.md §3）", () => {
       jackpotPoints: 15,
     });
 
-    expect(endRound(state, noShuffle).state.jackpotPoints).toBe(15);
+    expect(endRound(state, { ...noRolls, ...noShuffle }, chooser).state.jackpotPoints).toBe(15);
   });
 });
 
@@ -343,5 +358,100 @@ describe("determineWinners（勝敗判定・docs/spec.md §3）", () => {
     determineWinners(state);
 
     expect(state.players.map((p) => p.points)).toEqual([30, 12, 12]);
+  });
+});
+
+describe("ラウンド終了時に引いたイベント（docs/spec.md §6）", () => {
+  const noShuffle = { shuffle: <T>(items: readonly T[]): T[] => [...items] };
+  const eventCard = (kind: "extraSlot" | "openLane" | "lottery"): Card => ({
+    kind: "event",
+    event: kind,
+  });
+
+  it("イベントカードは手札に入らない（ルール解釈メモ）", () => {
+    const state = buildState({
+      drawPile: [eventCard("extraSlot"), coin(1), coin(1), coin(1), coin(1), coin(1)],
+    });
+
+    const result = endRound(state, { ...scriptedRng([]), ...noShuffle }, chooser);
+
+    expect(result.state.players[0]?.hand).toEqual([coin(1)]);
+    expect(result.state.players.flatMap((p) => p.hand).every((c) => c.kind === "coin")).toBe(true);
+  });
+
+  it("その場で効果を解決して捨て札にする（§6）", () => {
+    const state = buildState({
+      drawPile: [eventCard("extraSlot"), coin(1), coin(1), coin(1), coin(1), coin(1)],
+    });
+
+    const result = endRound(
+      state,
+      { ...scriptedRng([]), ...noShuffle },
+      {
+        chooseLane: () => 2,
+        choosePending: () => 0,
+      }
+    );
+
+    expect(result.state.lanes[2]?.hasExtraSlot).toBe(true);
+    expect(result.state.discardPile).toEqual([eventCard("extraSlot")]);
+  });
+
+  it("引き直しはしない（ドロー枚数は変わらない）", () => {
+    const state = buildState({
+      drawPile: [eventCard("extraSlot"), coin(1), coin(1), coin(1), coin(1), coin(1)],
+    });
+
+    const result = endRound(state, { ...scriptedRng([]), ...noShuffle }, chooser);
+
+    expect(result.state.drawPile).toEqual([]);
+  });
+
+  it("効果の得点は引いた人のものとして即座に確定する（ルール解釈メモ）", () => {
+    const base = buildState({
+      drawPile: [coin(1), coin(1), eventCard("openLane"), coin(1), coin(1), coin(1)],
+    });
+    const state = {
+      ...base,
+      lanes: base.lanes.map((lane, i) =>
+        i === 0 ? { ...lane, pending: faceDown([coin(3)]) } : lane
+      ),
+    };
+
+    // 2人目が openLane を引く
+    const result = endRound(state, { ...scriptedRng([]), ...noShuffle }, chooser);
+
+    expect(result.state.players[1]?.points).toBe(3);
+    expect(result.state.pendingPoints).toBe(0);
+  });
+
+  it("「投入口増設」でも追加手番は発生しない（ルール解釈メモ）", () => {
+    const state = buildState({
+      drawPile: [eventCard("extraSlot"), coin(1), coin(1), coin(1), coin(1), coin(1)],
+    });
+
+    const result = endRound(state, { ...scriptedRng([]), ...noShuffle }, chooser);
+
+    expect(result.events).toEqual([{ event: "extraSlot", extraTurn: false }]);
+  });
+
+  it("「抽選抽選」は引いた人が JP判定を行う", () => {
+    const state = buildState({
+      drawPile: [coin(1), coin(1), coin(1), coin(1), eventCard("lottery"), coin(1)],
+      jackpotCounter: 3,
+      jackpotPoints: 9,
+    });
+
+    // 3人目が lottery を引き、出目6 で当選する
+    const result = endRound(state, { ...scriptedRng([6]), ...noShuffle }, chooser);
+
+    expect(result.state.players[2]?.points).toBe(9);
+    expect(result.state.jackpotPoints).toBe(0);
+  });
+
+  it("イベントを引かなければ events は空", () => {
+    const state = buildState({ drawPile: Array.from({ length: 6 }, () => coin(1)) });
+
+    expect(endRound(state, { ...scriptedRng([]), ...noShuffle }, chooser).events).toEqual([]);
   });
 });

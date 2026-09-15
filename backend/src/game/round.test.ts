@@ -1,10 +1,15 @@
 import { describe, expect, it } from "vitest";
 import { coin, faceDown } from "../test-utils/cards.js";
+import type { Card } from "./deck.js";
 import { scriptedRng } from "../test-utils/rng.js";
 import { DEFAULT_BALANCE } from "./balance.js";
 import { createRng } from "./rng.js";
 import { setupGame, type GameState, type Lane } from "./setup.js";
+import type { EventChooser } from "./resolve.js";
 import { resolveInsertionRound } from "./round.js";
+
+/** レーン0・滞留の先頭を選ぶ chooser。イベントが落ちないテストでは使われない */
+const chooser: EventChooser = { chooseLane: () => 0, choosePending: () => 0 };
 
 /**
  * 手番プレイヤーの手札と各レーンを指定した初期状態を作る。
@@ -50,6 +55,7 @@ describe("resolveInsertionRound（投入ラウンド）", () => {
         { laneIndex: 2, handIndexes: [1] },
       ],
       // 3個目を振ったら「出目を使い切った」で落ちる
+      chooser,
       scriptedRng([1, 4])
     );
 
@@ -66,6 +72,7 @@ describe("resolveInsertionRound（投入ラウンド）", () => {
         { laneIndex: 0, handIndexes: [0] },
         { laneIndex: 1, handIndexes: [1] },
       ],
+      chooser,
       scriptedRng([1, 2])
     );
 
@@ -79,6 +86,7 @@ describe("resolveInsertionRound（投入ラウンド）", () => {
     const result = resolveInsertionRound(
       state,
       [{ laneIndex: 0, handIndexes: [0] }],
+      chooser,
       scriptedRng([3])
     );
 
@@ -92,6 +100,7 @@ describe("resolveInsertionRound（投入ラウンド）", () => {
     const result = resolveInsertionRound(
       state,
       [{ laneIndex: 0, handIndexes: [0] }],
+      chooser,
       scriptedRng([6])
     );
 
@@ -107,6 +116,7 @@ describe("resolveInsertionRound（投入ラウンド）", () => {
     const result = resolveInsertionRound(
       state,
       [{ laneIndex: 0, handIndexes: [0] }],
+      chooser,
       scriptedRng([3])
     );
 
@@ -122,6 +132,7 @@ describe("resolveInsertionRound（投入ラウンド）", () => {
     const result = resolveInsertionRound(
       state,
       [{ laneIndex: 0, handIndexes: [0] }],
+      chooser,
       scriptedRng([3])
     );
 
@@ -136,6 +147,7 @@ describe("resolveInsertionRound（投入ラウンド）", () => {
     const result = resolveInsertionRound(
       state,
       [{ laneIndex: 0, handIndexes: [0] }],
+      chooser,
       scriptedRng([3])
     );
 
@@ -151,6 +163,7 @@ describe("resolveInsertionRound（投入ラウンド）", () => {
         { laneIndex: 1, handIndexes: [1] },
         { laneIndex: 0, handIndexes: [0] },
       ],
+      chooser,
       scriptedRng([1, 1])
     );
 
@@ -164,6 +177,7 @@ describe("resolveInsertionRound（投入ラウンド）", () => {
     const result = resolveInsertionRound(
       state,
       [{ laneIndex: 0, handIndexes: [0] }],
+      chooser,
       scriptedRng([5])
     );
 
@@ -187,6 +201,7 @@ describe("resolveInsertionRound（投入ラウンド）", () => {
       const result = resolveInsertionRound(
         state,
         [{ laneIndex: 0, handIndexes: [0] }],
+        chooser,
         scriptedRng([6])
       );
 
@@ -200,6 +215,7 @@ describe("resolveInsertionRound（投入ラウンド）", () => {
       const result = resolveInsertionRound(
         state,
         [{ laneIndex: 0, handIndexes: [0] }],
+        chooser,
         scriptedRng([6])
       );
 
@@ -212,6 +228,7 @@ describe("resolveInsertionRound（投入ラウンド）", () => {
       const result = resolveInsertionRound(
         state,
         [{ laneIndex: 0, handIndexes: [0] }],
+        chooser,
         scriptedRng([6])
       );
 
@@ -227,6 +244,7 @@ describe("resolveInsertionRound（投入ラウンド）", () => {
       const result = resolveInsertionRound(
         state,
         [{ laneIndex: 0, handIndexes: [0] }],
+        chooser,
         scriptedRng([6])
       );
 
@@ -239,6 +257,7 @@ describe("resolveInsertionRound（投入ラウンド）", () => {
       const result = resolveInsertionRound(
         state,
         [{ laneIndex: 0, handIndexes: [0] }],
+        chooser,
         scriptedRng([6])
       );
 
@@ -251,6 +270,7 @@ describe("resolveInsertionRound（投入ラウンド）", () => {
       const result = resolveInsertionRound(
         state,
         [{ laneIndex: 0, handIndexes: [0] }],
+        chooser,
         scriptedRng([5])
       );
 
@@ -265,6 +285,7 @@ describe("resolveInsertionRound（投入ラウンド）", () => {
       const result = resolveInsertionRound(
         state,
         [{ laneIndex: 0, handIndexes: [0] }],
+        chooser,
         scriptedRng([6])
       );
 
@@ -283,6 +304,7 @@ describe("resolveInsertionRound（投入ラウンド）", () => {
           { laneIndex: 0, handIndexes: [0] },
           { laneIndex: 1, handIndexes: [1] },
         ],
+        chooser,
         scriptedRng([6, 6])
       );
 
@@ -303,6 +325,7 @@ describe("resolveInsertionRound（投入ラウンド）", () => {
       const result = resolveInsertionRound(
         state,
         [{ laneIndex: 0, handIndexes: [0] }],
+        chooser,
         scriptedRng([6, 6])
       );
 
@@ -317,6 +340,7 @@ describe("resolveInsertionRound（投入ラウンド）", () => {
       const result = resolveInsertionRound(
         state,
         [{ laneIndex: 0, handIndexes: [0] }],
+        chooser,
         scriptedRng([6, 3])
       );
 
@@ -332,6 +356,7 @@ describe("resolveInsertionRound（投入ラウンド）", () => {
       const result = resolveInsertionRound(
         state,
         [{ laneIndex: 0, handIndexes: [0] }],
+        chooser,
         scriptedRng([6])
       );
 
@@ -344,6 +369,7 @@ describe("resolveInsertionRound（投入ラウンド）", () => {
       const result = resolveInsertionRound(
         state,
         [{ laneIndex: 0, handIndexes: [0] }],
+        chooser,
         scriptedRng([5])
       );
 
@@ -354,7 +380,7 @@ describe("resolveInsertionRound（投入ラウンド）", () => {
   it("元の状態を変更しない", () => {
     const state = buildState([2], [{ stock: [coin(3)], pending: faceDown([coin(1)]) }]);
 
-    resolveInsertionRound(state, [{ laneIndex: 0, handIndexes: [0] }], scriptedRng([3]));
+    resolveInsertionRound(state, [{ laneIndex: 0, handIndexes: [0] }], chooser, scriptedRng([3]));
 
     expect(state.players[0]?.hand).toHaveLength(1);
     expect(state.pendingPoints).toBe(0);
@@ -368,6 +394,7 @@ describe("resolveInsertionRound（投入ラウンド）", () => {
       const result = resolveInsertionRound(
         state,
         [{ laneIndex: 0, handIndexes: [0] }],
+        chooser,
         scriptedRng([1])
       );
 
@@ -383,6 +410,7 @@ describe("resolveInsertionRound（投入ラウンド）", () => {
       const result = resolveInsertionRound(
         state,
         [{ laneIndex: 0, handIndexes: [0] }],
+        chooser,
         scriptedRng([6])
       );
 
@@ -396,6 +424,7 @@ describe("resolveInsertionRound（投入ラウンド）", () => {
       const result = resolveInsertionRound(
         state,
         [{ laneIndex: 0, handIndexes: [0] }],
+        chooser,
         scriptedRng([1])
       );
 
@@ -409,6 +438,7 @@ describe("resolveInsertionRound（投入ラウンド）", () => {
       const first = resolveInsertionRound(
         state,
         [{ laneIndex: 0, handIndexes: [0] }],
+        chooser,
         scriptedRng([1])
       );
       expect(first.state.insertionRoundsThisTurn).toBe(1);
@@ -416,6 +446,7 @@ describe("resolveInsertionRound（投入ラウンド）", () => {
       const second = resolveInsertionRound(
         first.state,
         [{ laneIndex: 0, handIndexes: [0] }],
+        chooser,
         scriptedRng([1])
       );
       expect(second.state.insertionRoundsThisTurn).toBe(2);
@@ -431,6 +462,7 @@ describe("resolveInsertionRound（投入ラウンド）", () => {
       const result = resolveInsertionRound(
         state,
         [{ laneIndex: 0, handIndexes: [0] }],
+        chooser,
         scriptedRng([1])
       );
 
@@ -452,6 +484,7 @@ describe("resolveInsertionRound（投入ラウンド）", () => {
       const result = resolveInsertionRound(
         base,
         [{ laneIndex: 0, handIndexes: [0] }],
+        chooser,
         scriptedRng([6])
       );
 
@@ -483,10 +516,41 @@ describe("resolveInsertionRound（投入ラウンド）", () => {
       const combinations = allRolls(laneCount);
       const busts = combinations.filter(
         // JP判定は起きない（カウンターが 0 から始まる）ので、出目は投入ラウンドのぶんだけ
-        (rolls) => resolveInsertionRound(state, insertions, scriptedRng(rolls)).busted
+        (rolls) => resolveInsertionRound(state, insertions, chooser, scriptedRng(rolls)).busted
       ).length;
 
       expect(busts / combinations.length).toBeCloseTo(1 - (5 / 6) ** laneCount, 10);
+    });
+  });
+
+  describe("落下カードのイベント（docs/spec.md §6）", () => {
+    const eventCard = (kind: "extraSlot"): Card => ({ kind: "event", event: kind });
+
+    it("落ちたカードがイベントなら効果を解決する", () => {
+      const state = buildState([2], [{ stock: [eventCard("extraSlot"), coin(1)] }, {}, {}]);
+
+      const result = resolveInsertionRound(
+        state,
+        [{ laneIndex: 0, handIndexes: [0] }],
+        { chooseLane: () => 2, choosePending: () => 0 },
+        scriptedRng([1])
+      );
+
+      expect(result.state.lanes[2]?.hasExtraSlot).toBe(true);
+      expect(result.events).toEqual([{ event: "extraSlot", extraTurn: true }]);
+    });
+
+    it("イベントが落ちなければ events は空", () => {
+      const state = buildState([2], [{ stock: [coin(1)] }, {}, {}]);
+
+      const result = resolveInsertionRound(
+        state,
+        [{ laneIndex: 0, handIndexes: [0] }],
+        chooser,
+        scriptedRng([1])
+      );
+
+      expect(result.events).toEqual([]);
     });
   });
 });
