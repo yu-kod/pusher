@@ -66,6 +66,27 @@ describe("simulateGame", () => {
     expect(stats.finished).toBe(true);
   });
 
+  it("1投入ラウンドで使ったレーン数を記録する（docs/spec.md §7）", () => {
+    const stats = simulateGame(DEFAULT_BALANCE, expectedValueStrategy(), createRng(4), PLAYERS);
+
+    expect(stats.lanesPerInsertion).toHaveLength(stats.insertionRounds);
+    expect(
+      stats.lanesPerInsertion.every((n) => n >= 1 && n <= DEFAULT_BALANCE.maxLanesPerRound)
+    ).toBe(true);
+  });
+
+  it("手番の終わり方を「自分でやめた」と「続けられなかった」に分けて数える", () => {
+    const stats = simulateGame(DEFAULT_BALANCE, expectedValueStrategy(), createRng(4), PLAYERS);
+
+    expect(stats.voluntaryStops + stats.forcedStops).toBe(stats.turns);
+  });
+
+  it("ランダム戦略は自分でやめる判断をする", () => {
+    const stats = simulateGame(DEFAULT_BALANCE, randomStrategy(), createRng(4), PLAYERS);
+
+    expect(stats.voluntaryStops).toBeGreaterThan(0);
+  });
+
   it("滞留の厚みを投入のたびに記録する（docs/spec.md §7）", () => {
     const stats = simulateGame(DEFAULT_BALANCE, expectedValueStrategy(), createRng(7), PLAYERS);
 
@@ -151,5 +172,54 @@ describe("simulateMany", () => {
       simulateMany(3, DEFAULT_BALANCE, expectedValueStrategy(), createRng(9), PLAYERS);
 
     expect(run()).toEqual(run());
+  });
+});
+
+describe("判断が発生しているかの指標（docs/spec.md §7 / #56）", () => {
+  it("1投入ラウンドあたりの平均レーン数を出す", () => {
+    const summary = simulateMany(
+      5,
+      DEFAULT_BALANCE,
+      expectedValueStrategy(),
+      createRng(1),
+      PLAYERS
+    );
+
+    expect(summary.avgLanesPerInsertion).toBeGreaterThanOrEqual(1);
+    expect(summary.avgLanesPerInsertion).toBeLessThanOrEqual(DEFAULT_BALANCE.maxLanesPerRound);
+  });
+
+  it("やめた時点の未確定得点を記録する（docs/spec.md §7 の引き際）", () => {
+    const stats = simulateGame(DEFAULT_BALANCE, expectedValueStrategy(), createRng(4), PLAYERS);
+
+    expect(stats.stopPoints).toHaveLength(stats.voluntaryStops);
+    expect(stats.stopPoints.every((n) => n >= 0)).toBe(true);
+  });
+
+  it("自分でやめた手番の割合を出す", () => {
+    const summary = simulateMany(5, DEFAULT_BALANCE, randomStrategy(), createRng(1), PLAYERS);
+
+    expect(summary.voluntaryStopRate).toBeGreaterThan(0);
+    expect(summary.voluntaryStopRate).toBeLessThanOrEqual(1);
+  });
+
+  it("やめた時点の未確定得点の平均を出す", () => {
+    const summary = simulateMany(
+      5,
+      DEFAULT_BALANCE,
+      expectedValueStrategy(),
+      createRng(1),
+      PLAYERS
+    );
+
+    expect(summary.avgStopPoints).toBeGreaterThan(0);
+  });
+
+  it("ゲームが 0 件でも壊れない", () => {
+    const summary = summarize([]);
+
+    expect(summary.avgLanesPerInsertion).toBe(0);
+    expect(summary.voluntaryStopRate).toBe(0);
+    expect(summary.avgStopPoints).toBe(0);
   });
 });
