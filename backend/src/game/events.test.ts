@@ -75,15 +75,16 @@ describe("resolveAvalanche（なだれ）", () => {
     expect(result.state.lanes[0]?.pending).toHaveLength(2);
   });
 
-  it("押し込んだあと補充も行う（docs/spec.md ルール解釈メモ）", () => {
+  it("通常の押し出しと同じく補充は行わない（docs/spec.md §4-3）", () => {
     const state = buildState([{ stock: [coin(1)], pending: faceDown([coin(2)]) }, {}, {}], {
       drawPile: [coin(3), coin(3)],
     });
 
     const result = resolveAvalanche(state);
 
-    expect(result.state.drawPile).toEqual([coin(3)]);
-    expect(result.state.lanes[0]?.stock.slice(-1)).toEqual([coin(3)]);
+    // 山札は減らない。落下カードの行き先は呼び出し側が決める（§4-2）
+    expect(result.state.drawPile).toEqual([coin(3), coin(3)]);
+    expect(result.state.lanes[0]?.stock).toEqual([coin(2)]);
   });
 
   it("滞留が全レーン空なら何も起きない", () => {

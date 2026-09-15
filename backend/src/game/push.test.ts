@@ -120,8 +120,8 @@ describe("resolvePush", () => {
     });
   });
 
-  describe("4-3. 補充", () => {
-    it("落下した枚数ぶん山札からレーンの奥へ補充する（docs/spec.md §4-3）", () => {
+  describe("4-3. 補充は行わない（docs/spec.md §4-3）", () => {
+    it("押し出しでは山札が減らない", () => {
       const state = buildState({
         stock: [coin(1), coin(1)],
         pending: [coin(2), coin(2)],
@@ -130,36 +130,24 @@ describe("resolvePush", () => {
 
       const result = resolvePush(state, 0, 2);
 
-      expect(result.state.drawPile).toEqual([coin(3)]);
-      expect(result.state.lanes[0]?.stock.slice(-2)).toEqual([coin(3), coin(3)]);
+      expect(result.state.drawPile).toEqual([coin(3), coin(3), coin(3)]);
     });
 
-    it("山札が足りなければあるぶんだけ補充する", () => {
-      const state = buildState({
-        stock: [coin(1), coin(1)],
-        pending: [coin(2), coin(2)],
-        drawPile: [coin(3)],
-      });
-
-      const result = resolvePush(state, 0, 2);
-
-      expect(result.state.drawPile).toEqual([]);
-      expect(result.state.lanes[0]?.stock.slice(-1)).toEqual([coin(3)]);
-    });
-
-    it("山札が空でも例外にならない", () => {
+    it("山札が空でも押し出しが成立する", () => {
       const state = buildState({
         stock: [coin(1), coin(1)],
         pending: [coin(2), coin(2)],
         drawPile: [],
       });
 
-      expect(() => resolvePush(state, 0, 2)).not.toThrow();
+      const result = resolvePush(state, 0, 2);
+
+      expect(result.fallenCards).toEqual([coin(1), coin(1)]);
     });
   });
 
-  describe("レーンの増減", () => {
-    it("成功のたびレーンの中身は押し込み枚数ぶん増える（docs/spec.md ルール解釈メモ）", () => {
+  describe("レーンの厚み", () => {
+    it("押し出しの前後でレーンの中身は増えも減りもしない（docs/spec.md §4-3）", () => {
       const state = buildState({
         stock: [coin(1), coin(1), coin(1)],
         pending: [coin(2), coin(2)],
@@ -168,8 +156,21 @@ describe("resolvePush", () => {
 
       const result = resolvePush(state, 0, 2);
 
-      // 3 + 2(押し込み) - 2(落下) + 2(補充) = 5
-      expect(result.state.lanes[0]?.stock).toHaveLength(5);
+      // 3 + 2(押し込み) - 2(落下) = 3
+      expect(result.state.lanes[0]?.stock).toHaveLength(3);
+    });
+
+    it("何度押し出してもレーンの厚みは変わらない", () => {
+      let state = buildState({
+        stock: [coin(1), coin(1), coin(1)],
+        pending: [coin(2), coin(2), coin(2), coin(2)],
+        drawPile: [coin(3), coin(3), coin(3)],
+      });
+
+      for (let i = 0; i < 2; i++) {
+        state = resolvePush(state, 0, 2).state;
+        expect(state.lanes[0]?.stock).toHaveLength(3);
+      }
     });
   });
 
