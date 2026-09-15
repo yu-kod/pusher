@@ -66,6 +66,8 @@ export type GameConfig = {
   handLimit: number;
   /** この数のラウンドが終わったらゲーム終了（§3） */
   maxRounds: number;
+  /** ジャックポットカウンターがこの値に達すると JP判定を行う（§5）。カウンターの上限でもある */
+  jackpotThreshold: number;
 };
 
 export const DEFAULT_GAME_CONFIG: GameConfig = {
@@ -75,6 +77,7 @@ export const DEFAULT_GAME_CONFIG: GameConfig = {
   initialHandSize: 5,
   handLimit: 7,
   maxRounds: 12,
+  jackpotThreshold: 5,
 };
 
 /** 3〜4人用（docs/spec.md 冒頭） */
