@@ -144,16 +144,25 @@ tfstate_lock_table      = "pusher-table-tfstate-lock"
 
 ## カスタムドメイン
 
-既定では CloudFront の既定ドメイン（`xxxxxxxx.cloudfront.net`）で公開する。**ドメインを用意しなくてもデプロイできる。**
+**`https://pusher-table.yu-web.site` で公開する。**
 
-独自ドメインを使う場合は `infra/variables.tf` の既定値を変えるか、`terraform.tfvars` を置く。
+`yu-web.site` の Route 53 ホストゾーンは setnote で作成済みのものを使う。他のプロジェクトも
+同じホストゾーンにサブドメインをぶら下げている（例: `pop-art-trick.yu-web.site`）。
+
+設定は `infra/variables.tf` の既定値。
 
 ```hcl
-domain_name      = "pusher.example.com"
-hosted_zone_name = "example.com"
+domain_name      = "pusher-table.yu-web.site"
+hosted_zone_name = "yu-web.site"
 ```
 
-`hosted_zone_name` は Route 53 のホストゾーンとして既に存在している必要がある。設定すると ACM 証明書（us-east-1）と Route 53 のレコードが自動で作られる。
+ACM 証明書（us-east-1）と Route 53 の検証レコード・A レコード（CloudFront への ALIAS）は
+Terraform が自動で作る。**初回の apply は証明書の DNS 検証が通るまで数分かかる。**
+
+### ドメインを使わない場合
+
+`domain_name` を空文字にすると CloudFront の既定ドメイン（`xxxxxxxx.cloudfront.net`）で公開し、
+ACM 証明書と Route 53 のレコードを作らない。ドメインを用意していない環境でもデプロイできる。
 
 ---
 

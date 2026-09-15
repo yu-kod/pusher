@@ -12,7 +12,7 @@ variable "project_name" {
 
 variable "domain_name" {
   description = <<-DESC
-    公開するカスタムドメイン（例: pusher-table.example.com）。
+    公開するカスタムドメイン。
 
     空文字にすると CloudFront の既定ドメインで公開し、ACM 証明書と Route 53 の
     レコードを作らない。ドメインを用意していない段階ではこちらで始められる。
@@ -20,13 +20,13 @@ variable "domain_name" {
     値を入れる場合は hosted_zone_name も指定すること。
   DESC
   type        = string
-  default     = ""
+  default     = "pusher-table.yu-web.site"
 }
 
 variable "hosted_zone_name" {
-  description = "domain_name を管理している Route 53 ホストゾーン名（例: example.com）"
+  description = "domain_name を管理している Route 53 ホストゾーン名"
   type        = string
-  default     = ""
+  default     = "yu-web.site"
 }
 
 variable "lambda_runtime" {
