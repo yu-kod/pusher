@@ -90,6 +90,8 @@ export function collectFallenCards(state: GameState, cards: readonly Card[]): Ga
 
 /**
  * 未確定得点を手番プレイヤーの得点として確定する（docs/spec.md §3「やめる」）。
+ *
+ * ここで手番が終わるので、投入ラウンドの回数も 0 に戻す。
  */
 export function bankPendingPoints(state: GameState): GameState {
   const player = state.players[state.currentPlayerIndex];
@@ -101,5 +103,5 @@ export function bankPendingPoints(state: GameState): GameState {
     index === state.currentPlayerIndex ? { ...p, points: p.points + state.pendingPoints } : p
   );
 
-  return { ...state, players, pendingPoints: 0 };
+  return { ...state, players, pendingPoints: 0, insertionRoundsThisTurn: 0 };
 }

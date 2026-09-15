@@ -59,6 +59,13 @@ export type GameState = {
    * ジャックポットへ移る。手番の開始時は 0。
    */
   pendingPoints: number;
+  /**
+   * この手番でこれまでに行った投入ラウンドの回数（§3）。
+   *
+   * 手番が終わる（「やめる」または横穴）たびに 0 に戻る。
+   * config.maxInsertionRoundsPerTurn と突き合わせて、続けられるかを判定する。
+   */
+  insertionRoundsThisTurn: number;
   /** ジャックポットに溜まった点数（§5） */
   jackpotPoints: number;
   /** ジャックポットカウンター（0〜5） */
@@ -124,6 +131,7 @@ export function setupGame(playerNames: readonly string[], rng: Rng, config: Bala
     drawPile: deck.slice(next),
     discardPile: [],
     pendingPoints: 0,
+    insertionRoundsThisTurn: 0,
     jackpotPoints: 0,
     jackpotCounter: 0,
     currentPlayerIndex: 0,

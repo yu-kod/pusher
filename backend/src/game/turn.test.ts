@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { createRng } from "./rng.js";
-import { DEFAULT_BALANCE } from "./balance.js";
-import { setupGame } from "./setup.js";
-import { faceDown } from "../test-utils/cards.js";
-import { calculateTarget, classifyRoll, insertCards, type RollOutcome } from "./turn.js";
+import { DEFAULT_BALANCE, withPreset } from "./balance.js";
+import { setupGame, type GameState } from "./setup.js";
+import { coin, faceDown } from "../test-utils/cards.js";
+import { calculateTarget, classifyRoll, insertIntoLanes, type RollOutcome } from "./turn.js";
 
 describe("calculateTarget", () => {
   it("投入カードのコイン数と滞留枚数の合計になる（docs/spec.md §3）", () => {
@@ -86,40 +86,39 @@ describe("classifyRoll", () => {
   });
 });
 
-describe("insertCards", () => {
-  /** 手札を指定のカードに差し替えた初期状態を作る */
+describe("insertIntoLanes", () => {
+  /** 手番プレイヤーの手札と、先頭レーンの滞留枚数を指定した初期状態を作る */
   function stateWithHand(coins: readonly (1 | 2 | 3)[], pendingCount = 0) {
     const base = setupGame(["A", "B", "C"], createRng(1), DEFAULT_BALANCE);
     const players = base.players.map((p, i) =>
       i === 0 ? { ...p, hand: coins.map((c) => ({ kind: "coin" as const, coins: c })) } : p
     );
-    const lanes = base.lanes.map((lane, i) =>
-      i === 0
-        ? {
-            ...lane,
-            pending: faceDown(Array.from({ length: pendingCount }, () => base.drawPile[0]!)),
-          }
-        : lane
-    );
+    const lanes = base.lanes.map((lane, i) => ({
+      ...lane,
+      pending: i === 0 ? faceDown(Array.from({ length: pendingCount }, () => coin(1))) : [],
+    }));
     return { ...base, players, lanes };
   }
+
+  /** 1レーンへ1枚だけ投入する（よく使う最小の指定） */
+  const intoLane = (laneIndex: number, handIndexes: readonly number[]) => [
+    { laneIndex, handIndexes },
+  ];
 
   it("手札のカードを滞留エリアへ移す（docs/spec.md §3）", () => {
     const state = stateWithHand([2, 1]);
 
-    const result = insertCards(state, 0, [0]);
+    const result = insertIntoLanes(state, intoLane(0, [0]));
 
-    expect(result.state.lanes[0]?.pending).toHaveLength(1);
-    expect(result.state.lanes[0]?.pending[0]).toEqual({
-      card: { kind: "coin", coins: 2 },
-      faceUp: false,
-    });
+    expect(result.state.lanes[0]?.pending).toEqual([
+      { card: { kind: "coin", coins: 2 }, faceUp: false },
+    ]);
   });
 
   it("投入したカードを手札から取り除く", () => {
     const state = stateWithHand([2, 1]);
 
-    const result = insertCards(state, 0, [0]);
+    const result = insertIntoLanes(state, intoLane(0, [0]));
 
     expect(result.state.players[0]?.hand).toEqual([{ kind: "coin", coins: 1 }]);
   });
@@ -127,13 +126,13 @@ describe("insertCards", () => {
   it("投入前の滞留枚数から目標値を算出する", () => {
     const state = stateWithHand([2], 3);
 
-    expect(insertCards(state, 0, [0]).target).toBe(5);
+    expect(insertIntoLanes(state, intoLane(0, [0])).lanes[0]?.target).toBe(5);
   });
 
   it("元の状態を変更しない", () => {
     const state = stateWithHand([2, 1]);
 
-    insertCards(state, 0, [0]);
+    insertIntoLanes(state, intoLane(0, [0]));
 
     expect(state.players[0]?.hand).toHaveLength(2);
     expect(state.lanes[0]?.pending).toHaveLength(0);
@@ -143,72 +142,158 @@ describe("insertCards", () => {
     const state = { ...stateWithHand([2, 1]), currentPlayerIndex: 1 };
 
     // 手番は B なので、A の手札は減らない
-    const result = insertCards(state, 0, [0]);
+    const result = insertIntoLanes(state, intoLane(0, [0]));
 
     expect(result.state.players[0]?.hand).toHaveLength(2);
     expect(result.state.players[1]?.hand).toHaveLength(4);
   });
 
-  describe("投入口増設", () => {
-    it("マーカーがあれば 2 枚同時に投入できる（docs/spec.md §6）", () => {
-      const base = stateWithHand([3, 2, 1]);
-      const state = {
-        ...base,
-        lanes: base.lanes.map((l, i) => (i === 0 ? { ...l, hasExtraSlot: true } : l)),
-      };
+  describe("複数レーンへの同時投入（docs/spec.md §3 投入ラウンド）", () => {
+    it("各レーンへ1枚ずつ同時に投入できる", () => {
+      const state = stateWithHand([3, 2, 1]);
 
-      const result = insertCards(state, 0, [0, 1]);
+      const result = insertIntoLanes(state, [
+        { laneIndex: 0, handIndexes: [0] },
+        { laneIndex: 1, handIndexes: [1] },
+        { laneIndex: 2, handIndexes: [2] },
+      ]);
+
+      expect(result.state.lanes.map((l) => l.pending.length)).toEqual([1, 1, 1]);
+      expect(result.state.players[0]?.hand).toEqual([]);
+    });
+
+    it("投入しなかったレーンには何も入らない", () => {
+      const state = stateWithHand([3, 2, 1]);
+
+      const result = insertIntoLanes(state, intoLane(1, [0]));
+
+      expect(result.state.lanes.map((l) => l.pending.length)).toEqual([0, 1, 0]);
+      expect(result.state.players[0]?.hand).toHaveLength(2);
+    });
+
+    it("手札の添字は投入前の手札に対する添字として解釈する", () => {
+      const state = stateWithHand([3, 2, 1]);
+
+      const result = insertIntoLanes(state, [
+        { laneIndex: 0, handIndexes: [0] },
+        { laneIndex: 1, handIndexes: [2] },
+      ]);
+
+      expect(result.state.lanes[0]?.pending[0]?.card).toEqual({ kind: "coin", coins: 3 });
+      expect(result.state.lanes[1]?.pending[0]?.card).toEqual({ kind: "coin", coins: 1 });
+      // 残るのは投入しなかった 2コイン札
+      expect(result.state.players[0]?.hand).toEqual([{ kind: "coin", coins: 2 }]);
+    });
+
+    it("レーンごとの内訳を左から順に返す（§3 の解決順）", () => {
+      const state = stateWithHand([3, 1], 2);
+
+      const result = insertIntoLanes(state, [
+        { laneIndex: 2, handIndexes: [1] },
+        { laneIndex: 0, handIndexes: [0] },
+      ]);
+
+      expect(result.lanes).toEqual([
+        // 滞留2枚のレーンなので 3 + 2
+        { laneIndex: 0, insertedCoins: 3, target: 5 },
+        { laneIndex: 2, insertedCoins: 1, target: 1 },
+      ]);
+    });
+  });
+
+  describe("投入口増設", () => {
+    /** 先頭レーンに増設マーカーを置いた状態にする */
+    function withExtraSlot(state: GameState): GameState {
+      return {
+        ...state,
+        lanes: state.lanes.map((l, i) => (i === 0 ? { ...l, hasExtraSlot: true } : l)),
+      };
+    }
+
+    it("マーカーがあれば 2 枚同時に投入できる（docs/spec.md §6）", () => {
+      const state = withExtraSlot(stateWithHand([3, 2, 1]));
+
+      const result = insertIntoLanes(state, intoLane(0, [0, 1]));
 
       expect(result.state.lanes[0]?.pending).toHaveLength(2);
-      expect(result.target).toBe(5);
+      expect(result.lanes[0]?.target).toBe(5);
     });
 
     it("マーカーがなければ 2 枚同時に投入できない", () => {
       const state = stateWithHand([3, 2]);
 
-      expect(() => insertCards(state, 0, [0, 1])).toThrow(Error);
+      expect(() => insertIntoLanes(state, intoLane(0, [0, 1]))).toThrow(Error);
     });
 
     it("マーカーがあっても 3 枚は投入できない", () => {
-      const base = stateWithHand([3, 2, 1]);
-      const state = {
-        ...base,
-        lanes: base.lanes.map((l, i) => (i === 0 ? { ...l, hasExtraSlot: true } : l)),
-      };
+      const state = withExtraSlot(stateWithHand([3, 2, 1]));
 
-      expect(() => insertCards(state, 0, [0, 1, 2])).toThrow(Error);
+      expect(() => insertIntoLanes(state, intoLane(0, [0, 1, 2]))).toThrow(Error);
+    });
+
+    it("同じ手札を 2 回指定したら例外を投げる", () => {
+      const state = withExtraSlot(stateWithHand([3, 2]));
+
+      expect(() => insertIntoLanes(state, intoLane(0, [0, 0]))).toThrow(Error);
     });
   });
 
   describe("入力の検証", () => {
+    it("1レーンも指定しなければ例外を投げる（最低1枚は投入する）", () => {
+      expect(() => insertIntoLanes(stateWithHand([2]), [])).toThrow(Error);
+    });
+
     it("1 枚も指定しなければ例外を投げる", () => {
-      expect(() => insertCards(stateWithHand([2]), 0, [])).toThrow(Error);
+      expect(() => insertIntoLanes(stateWithHand([2]), intoLane(0, []))).toThrow(Error);
     });
 
     it("存在しないレーンなら例外を投げる", () => {
-      expect(() => insertCards(stateWithHand([2]), 9, [0])).toThrow(RangeError);
-      expect(() => insertCards(stateWithHand([2]), -1, [0])).toThrow(RangeError);
+      expect(() => insertIntoLanes(stateWithHand([2]), intoLane(9, [0]))).toThrow(RangeError);
+      expect(() => insertIntoLanes(stateWithHand([2]), intoLane(-1, [0]))).toThrow(RangeError);
     });
 
     it("存在しない手札の添字なら例外を投げる", () => {
-      expect(() => insertCards(stateWithHand([2]), 0, [5])).toThrow(RangeError);
-      expect(() => insertCards(stateWithHand([2]), 0, [-1])).toThrow(RangeError);
+      expect(() => insertIntoLanes(stateWithHand([2]), intoLane(0, [5]))).toThrow(RangeError);
+      expect(() => insertIntoLanes(stateWithHand([2]), intoLane(0, [-1]))).toThrow(RangeError);
     });
 
-    it("同じ手札を 2 回指定したら例外を投げる", () => {
-      const base = stateWithHand([3, 2]);
-      const state = {
-        ...base,
-        lanes: base.lanes.map((l, i) => (i === 0 ? { ...l, hasExtraSlot: true } : l)),
-      };
+    it("同じレーンを2回指定したら例外を投げる", () => {
+      const state = stateWithHand([3, 2]);
 
-      expect(() => insertCards(state, 0, [0, 0])).toThrow(Error);
+      expect(() =>
+        insertIntoLanes(state, [
+          { laneIndex: 0, handIndexes: [0] },
+          { laneIndex: 0, handIndexes: [1] },
+        ])
+      ).toThrow(Error);
+    });
+
+    it("同じ手札を別のレーンへ指定したら例外を投げる", () => {
+      const state = stateWithHand([3, 2]);
+
+      expect(() =>
+        insertIntoLanes(state, [
+          { laneIndex: 0, handIndexes: [0] },
+          { laneIndex: 1, handIndexes: [0] },
+        ])
+      ).toThrow(Error);
+    });
+
+    it("config.maxLanesPerRound を超えるレーン数なら例外を投げる", () => {
+      const state = { ...stateWithHand([3, 2, 1]), config: withPreset("singleLane") };
+
+      expect(() =>
+        insertIntoLanes(state, [
+          { laneIndex: 0, handIndexes: [0] },
+          { laneIndex: 1, handIndexes: [1] },
+        ])
+      ).toThrow(/レーン/);
     });
 
     it("手番プレイヤーの添字が範囲外なら例外を投げる", () => {
       const state = { ...stateWithHand([2]), currentPlayerIndex: 99 };
 
-      expect(() => insertCards(state, 0, [0])).toThrow(RangeError);
+      expect(() => insertIntoLanes(state, intoLane(0, [0]))).toThrow(RangeError);
     });
 
     it("イベントカードは投入できない（docs/spec.md ルール解釈メモ）", () => {
@@ -220,7 +305,7 @@ describe("insertCards", () => {
         ),
       };
 
-      expect(() => insertCards(state, 0, [0])).toThrow(/イベントカード/);
+      expect(() => insertIntoLanes(state, intoLane(0, [0]))).toThrow(/イベントカード/);
     });
   });
 });

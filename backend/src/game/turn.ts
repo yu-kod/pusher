@@ -69,72 +69,126 @@ export function classifyRoll(roll: number, target: number): RollOutcome {
   return roll <= target ? "success" : "failure";
 }
 
-export type InsertResult = {
-  /** 投入後の状態。滞留エリアにカードが入り、手札から取り除かれている */
-  state: GameState;
-  /** 投入したカードのコイン数の合計 */
+/** 1レーンぶんの投入指定。手札の添字は**投入前**の手札に対する添字 */
+export type LaneInsertion = {
+  laneIndex: number;
+  handIndexes: readonly number[];
+};
+
+/** 投入したレーン1本ぶんの内訳 */
+export type LaneInsertionDetail = {
+  laneIndex: number;
+  /** そのレーンへ投入したカードのコイン数の合計 */
   insertedCoins: number;
   /** 投入前の滞留枚数から算出した目標値 */
   target: number;
 };
 
+export type InsertIntoLanesResult = {
+  /** 投入後の状態。指定した各レーンの滞留エリアにカードが入り、手札から取り除かれている */
+  state: GameState;
+  /** レーンごとの内訳。**左から順**に並ぶ（docs/spec.md §3 の解決順） */
+  lanes: LaneInsertionDetail[];
+};
+
 /**
- * 手番プレイヤーの手札から、指定のレーンの滞留エリアへカードを投入する（docs/spec.md §3）。
+ * 手番プレイヤーの手札から、複数のレーンへ同時に投入する（docs/spec.md §3 投入ラウンド）。
+ *
+ * - 各レーンへ**最大1枚ずつ**（「投入口増設」のあるレーンは2枚まで。§6）
+ * - 同じレーンは2回指定できない
+ * - 最低1レーンは投入する（パスはできない）
+ * - 投入できるレーン数の上限は `config.maxLanesPerRound`
+ *
+ * 手札の添字はすべて**投入前**の手札に対する添字として解釈する。レーンごとに
+ * 順次取り除くと添字がずれてしまうため、まとめて解決してから一度に取り除く。
  *
  * 手番プレイヤー以外は指定できない（引数にプレイヤーを取らない）。
  * 呼び出し側（API）が「要求元が手番プレイヤーか」を検証する。
  */
-export function insertCards(
+export function insertIntoLanes(
   state: GameState,
-  laneIndex: number,
-  handIndexes: readonly number[]
-): InsertResult {
-  const lane = state.lanes[laneIndex];
-  if (lane === undefined) {
-    throw new RangeError(`存在しないレーン: ${laneIndex}`);
-  }
-
+  insertions: readonly LaneInsertion[]
+): InsertIntoLanesResult {
   const player = state.players[state.currentPlayerIndex];
   if (player === undefined) {
     throw new RangeError(`手番プレイヤーがいない: ${state.currentPlayerIndex}`);
   }
 
-  const maxCards = lane.hasExtraSlot ? MAX_CARDS_WITH_EXTRA_SLOT : 1;
-  if (handIndexes.length < 1 || handIndexes.length > maxCards) {
+  if (insertions.length < 1) {
+    throw new Error("最低1レーンには投入する必要がある");
+  }
+  if (insertions.length > state.config.maxLanesPerRound) {
     throw new Error(
-      `このレーンへ同時に投入できるのは 1〜${maxCards} 枚: ${handIndexes.length} 枚を指定した`
+      `1回の投入ラウンドで投入できるのは ${state.config.maxLanesPerRound} レーンまで: ${insertions.length} レーンを指定した`
     );
   }
-  if (new Set(handIndexes).size !== handIndexes.length) {
-    throw new Error(`同じ手札を複数回指定している: ${handIndexes.join(", ")}`);
+  if (new Set(insertions.map((i) => i.laneIndex)).size !== insertions.length) {
+    throw new Error("同じレーンを複数回指定している");
   }
 
-  const cards: CoinCard[] = handIndexes.map((handIndex) => {
-    const card = player.hand[handIndex];
-    if (card === undefined) {
-      throw new RangeError(`存在しない手札: ${handIndex}`);
+  const allHandIndexes = insertions.flatMap((i) => i.handIndexes);
+  if (new Set(allHandIndexes).size !== allHandIndexes.length) {
+    throw new Error(`同じ手札を複数回指定している: ${allHandIndexes.join(", ")}`);
+  }
+
+  // 解決順（左から）に揃えてから処理する。指定の順序には依存しない
+  const sorted = [...insertions].sort((a, b) => a.laneIndex - b.laneIndex);
+
+  const inserted = sorted.map(({ laneIndex, handIndexes }) => {
+    const lane = state.lanes[laneIndex];
+    if (lane === undefined) {
+      throw new RangeError(`存在しないレーン: ${laneIndex}`);
     }
-    if (isEventCard(card)) {
-      // docs/spec.md のルール解釈メモを参照。コイン数がないため目標値を算出できない
-      throw new Error(`イベントカードは投入できない: ${card.event}`);
+
+    const maxCards = lane.hasExtraSlot ? MAX_CARDS_WITH_EXTRA_SLOT : 1;
+    if (handIndexes.length < 1 || handIndexes.length > maxCards) {
+      throw new Error(
+        `このレーンへ同時に投入できるのは 1〜${maxCards} 枚: ${handIndexes.length} 枚を指定した`
+      );
     }
-    return card;
+
+    const cards: CoinCard[] = handIndexes.map((handIndex) => {
+      const card = player.hand[handIndex];
+      if (card === undefined) {
+        throw new RangeError(`存在しない手札: ${handIndex}`);
+      }
+      if (isEventCard(card)) {
+        // docs/spec.md のルール解釈メモを参照。コイン数がないため目標値を算出できない
+        throw new Error(`イベントカードは投入できない: ${card.event}`);
+      }
+      return card;
+    });
+
+    const insertedCoins = cards.reduce((sum, card) => sum + card.coins, 0);
+    return {
+      laneIndex,
+      cards,
+      insertedCoins,
+      target: calculateTarget(insertedCoins, lane.pending.length),
+    };
   });
 
-  const insertedCoins = cards.reduce((sum, card) => sum + card.coins, 0);
-  const target = calculateTarget(insertedCoins, lane.pending.length);
-
-  const removed = new Set(handIndexes);
+  const removed = new Set(allHandIndexes);
   const players = state.players.map((p, index) =>
     index === state.currentPlayerIndex
       ? { ...p, hand: p.hand.filter((_, handIndex) => !removed.has(handIndex)) }
       : p
   );
-  const lanes = state.lanes.map((l, index) =>
-    index === laneIndex
-      ? { ...l, pending: [...l.pending, ...cards.map((card) => ({ card, faceUp: false }))] }
-      : l
-  );
 
-  return { state: { ...state, players, lanes }, insertedCoins, target };
+  const byLane = new Map(inserted.map((i) => [i.laneIndex, i.cards]));
+  const lanes = state.lanes.map((lane, index) => {
+    const cards = byLane.get(index);
+    return cards === undefined
+      ? lane
+      : { ...lane, pending: [...lane.pending, ...cards.map((card) => ({ card, faceUp: false }))] };
+  });
+
+  return {
+    state: { ...state, players, lanes },
+    lanes: inserted.map(({ laneIndex, insertedCoins, target }) => ({
+      laneIndex,
+      insertedCoins,
+      target,
+    })),
+  };
 }

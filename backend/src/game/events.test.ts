@@ -1,22 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { coin, faceDown, faceUp } from "../test-utils/cards.js";
-import { createRng, type Rng } from "./rng.js";
+import { scriptedRng } from "../test-utils/rng.js";
+import { createRng } from "./rng.js";
 import { DEFAULT_BALANCE } from "./balance.js";
 import { setupGame, type GameState, type Lane } from "./setup.js";
 import { resolveAvalanche, resolveExtraSlot, resolveLottery, resolveOpenLane } from "./events.js";
-
-function scriptedRng(rolls: readonly number[]): Rng {
-  let index = 0;
-  return {
-    nextInt: () => 0,
-    shuffle: (items) => [...items],
-    rollD6: () => {
-      const roll = rolls[index++];
-      if (roll === undefined) throw new Error("出目を使い切った");
-      return roll;
-    },
-  };
-}
 
 function buildState(lanes: Partial<Lane>[], overrides?: Partial<GameState>): GameState {
   const base = setupGame(["A", "B", "C"], createRng(1), DEFAULT_BALANCE);
