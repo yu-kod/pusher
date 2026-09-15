@@ -56,6 +56,24 @@ cd backend && npm test
 
 いずれもカバレッジ 100% を閾値にしている。
 
+### バランスシミュレーション
+
+ゲームエンジンを直接回して `docs/spec.md` §7 の数値を測る。API もサーバーも要らない。
+
+```bash
+cd backend
+npm run sim                                    # 既定値で 2000 ゲーム
+npm run sim -- --games 5000                    # 回数を変える
+npm run sim -- --preset pushHalf               # プリセットを重ねる（複数指定可）
+npm run sim -- --preset singleLane --preset roundDraw3
+npm run sim -- --strategy random               # 戦略を変える（既定は expectedValue）
+npm run sim -- --players 3 --seed 7            # 人数とシードを指定する
+```
+
+同じシードなら同じ結果になる。出力される指標と目標値は `docs/spec.md` §7、実測結果の分析は `docs/design-notes.md` を参照。
+
+プリセットの一覧は `backend/src/game/balance.ts` の `BALANCE_PRESETS` にある。
+
 ### その他のコマンド
 
 各パッケージで実行する。
