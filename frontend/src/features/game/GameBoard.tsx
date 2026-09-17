@@ -5,6 +5,7 @@ import { ErrorMessage } from "@/components/ErrorMessage";
 import { Lane } from "./components/Lane";
 import { HandCard } from "./components/HandCard";
 import { Die } from "./components/Die";
+import { sideHoleHint } from "@/lib/rules";
 import type { Card, Credentials, GameView } from "@/lib/types";
 
 type Props = {
@@ -48,6 +49,17 @@ export function GameBoard({ code, game, credentials, reload }: Props) {
       return null;
     }
     return card.coins + lane.pending.length;
+  };
+
+  /**
+   * このレーンだけが横穴になりうるか（§5）。
+   *
+   * 下限が 1 のときはどのレーンでも起きるので、レーンごとの印は出さない。
+   * 条件そのものは盤面の下に一行で出している。
+   */
+  const riskyFor = (target: number | null): boolean => {
+    const { minTarget } = game.rules.sideHole;
+    return target !== null && minTarget > 1 && target >= minTarget;
   };
 
   const run = (action: () => Promise<unknown>) => {
@@ -106,12 +118,17 @@ export function GameBoard({ code, game, credentials, reload }: Props) {
               lane={lane}
               index={index}
               target={targetFor(index)}
+              risky={riskyFor(targetFor(index))}
               selected={selectedLane === index}
               disabled={!isMyTurn || finished || busy}
               onSelect={() => setSelectedLane(index)}
             />
           ))}
         </section>
+
+        <p className="mt-2 text-center text-[11px] text-red-200">
+          {sideHoleHint(game.rules.sideHole)} — 未確定得点はジャックポットへ
+        </p>
 
         <Piles drawCount={game.drawPileCount} discardCount={game.discardPileCount} />
 

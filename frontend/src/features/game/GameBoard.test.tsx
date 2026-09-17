@@ -153,7 +153,13 @@ describe("目標値の提示（docs/spec.md §3）", () => {
     expect(screen.getByText("目標値 3")).toBeInTheDocument();
   });
 
-  it("目標値が6以上のレーンは横穴のリスクを知らせる（docs/spec.md §5）", async () => {
+  it("横穴になる出目を常に示す（docs/spec.md §5）", () => {
+    setup();
+
+    expect(screen.getByText(/出目 6 は横穴/)).toBeInTheDocument();
+  });
+
+  it("どのレーンも同じ危険度なら、レーンごとの印は出さない（#67）", async () => {
     const { user } = setup(
       buildGame({
         lanes: [
@@ -163,6 +169,29 @@ describe("目標値の提示（docs/spec.md §3）", () => {
         ],
       })
     );
+
+    await user.click(screen.getByRole("button", { name: "1コイン札" }));
+
+    expect(screen.getByText("目標値 6")).toBeInTheDocument();
+    expect(screen.queryByText("横穴あり")).not.toBeInTheDocument();
+  });
+
+  it("目標値に下限がある設定では、危険なレーンにだけ印を出す（docs/spec.md §5）", async () => {
+    const game = buildGame({
+      rules: {
+        laneCount: 3,
+        maxLanesPerRound: 1,
+        maxRounds: 13,
+        jackpotThreshold: 5,
+        sideHole: { minRoll: 6, minTarget: 6 },
+      },
+      lanes: [
+        buildLane({ pending: Array.from({ length: 5 }, () => ({ faceUp: false as const })) }),
+        buildLane(),
+        buildLane(),
+      ],
+    });
+    const { user } = setup(game);
 
     await user.click(screen.getByRole("button", { name: "1コイン札" }));
 
@@ -423,7 +452,13 @@ describe("レーン本数が違う設定", () => {
   it("4本でも名前がないレーンを添字で表示する", () => {
     setup(
       buildGame({
-        rules: { laneCount: 4, maxLanesPerRound: 1, maxRounds: 13, jackpotThreshold: 5 },
+        rules: {
+          laneCount: 4,
+          maxLanesPerRound: 1,
+          maxRounds: 13,
+          jackpotThreshold: 5,
+          sideHole: { minRoll: 6, minTarget: 1 },
+        },
         lanes: [buildLane(), buildLane(), buildLane(), buildLane()],
       })
     );

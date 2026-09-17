@@ -18,6 +18,8 @@ type Props = {
   index: number;
   /** 投入カードを選んでいれば、このレーンへ入れたときの目標値 */
   target: number | null;
+  /** このレーンだけが横穴になりうるか（レーンごとに危険度が違う設定のときだけ true） */
+  risky: boolean;
   selected: boolean;
   disabled: boolean;
   onSelect: () => void;
@@ -30,10 +32,8 @@ type Props = {
  * 滞留の厚みが圧力そのものなので、枚数を数字だけでなくカードの重なりでも
  * 見せる（§4-1）。中身は裏向きなので持たない。
  */
-export function Lane({ lane, index, target, selected, disabled, onSelect }: Props) {
+export function Lane({ lane, index, target, risky, selected, disabled, onSelect }: Props) {
   const name = LANE_NAMES[index] ?? String(index);
-  // 目標値6以上なら出目6が横穴になる（§5）
-  const risky = target !== null && target >= 6;
   const stockCards = Math.min(lane.stockCount, MAX_STOCK_CARDS);
   const pendingHeight = SMALL_CARD_HEIGHT + Math.max(lane.pending.length - 1, 0) * STACK_OFFSET;
 

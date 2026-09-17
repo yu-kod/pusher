@@ -1,7 +1,7 @@
 /**
  * 横穴とジャックポット（docs/spec.md §5）。
  *
- * 横穴は出目6かつ目標値6以上のとき発生する（判定は turn.ts）。
+ * 横穴は出目が `sideHole.minRoll` 以上のとき発生する（判定は turn.ts）。
  * 押し出し自体は通常どおり処理され（push.ts）、落ちたカードの行き先だけが変わる。
  */
 import type { Rng } from "./rng.js";

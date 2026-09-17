@@ -164,11 +164,20 @@ describe("expectedValueStrategy", () => {
     expect(lanes).toEqual([...lanes].sort((a, b) => a - b));
   });
 
-  it("横穴のないレーン（目標値6未満）ならいくら積んでも投入し続けられる", () => {
-    // 滞留なしに1コイン札 → 目標値1。出目6でも横穴にならない
-    const state = buildState([1, 1, 1], [{}, {}, {}], { pendingPoints: 100 });
+  it("横穴に下限があれば、リスク0のレーンへはいくら積んでも投入し続けられる（#67 以前の既定）", () => {
+    // 滞留なしに1コイン札 → 目標値1。下限が6なら出目6でも横穴にならない
+    const state = buildState([1, 1, 1], [{}, {}, {}], {
+      pendingPoints: 100,
+      config: withPreset("sideHoleTarget6"),
+    });
 
     expect(strategy.chooseInsertions(state, createRng(1)).length).toBeGreaterThanOrEqual(1);
+  });
+
+  it("既定では逃げ道が無いので、積みすぎたらどのレーンへも投入しない（#67）", () => {
+    const state = buildState([1, 1, 1], [{}, {}, {}], { pendingPoints: 100 });
+
+    expect(strategy.chooseInsertions(state, createRng(1))).toEqual([]);
   });
 
   it("手札が空なら投入しない", () => {
@@ -183,7 +192,7 @@ describe("expectedValueStrategy", () => {
   });
 
   it("引き際でなければ続ける", () => {
-    const state = buildState([1, 1, 1], [{}, {}, {}], { pendingPoints: 3 });
+    const state = buildState([1, 1, 1], [{}, {}, {}], { pendingPoints: 1 });
 
     expect(strategy.shouldContinue(state, createRng(1))).toBe(true);
   });

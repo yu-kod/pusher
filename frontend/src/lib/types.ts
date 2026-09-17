@@ -27,11 +27,15 @@ export type PlayerView = {
   hand: HandView;
 };
 
+/** 横穴（バースト）の発生条件（docs/spec.md §5）。判定はサーバーが行う */
+export type SideHoleRule = { minRoll: number; minTarget: number };
+
 export type RulesView = {
   laneCount: number;
   maxLanesPerRound: number;
   maxRounds: number;
   jackpotThreshold: number;
+  sideHole: SideHoleRule;
 };
 
 export type GameView = {

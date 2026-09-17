@@ -196,6 +196,7 @@ describe("viewFor（クライアントへ返す状態・docs/spec.md §8）", ()
         maxLanesPerRound: DEFAULT_BALANCE.maxLanesPerRound,
         maxRounds: DEFAULT_BALANCE.maxRounds,
         jackpotThreshold: DEFAULT_BALANCE.jackpotThreshold,
+        sideHole: DEFAULT_BALANCE.sideHole,
       });
     });
 

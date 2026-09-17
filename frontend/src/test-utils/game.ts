@@ -21,7 +21,13 @@ export function buildPlayer(overrides: Partial<PlayerView> = {}): PlayerView {
 export function buildGame(overrides: Partial<GameView> = {}): GameView {
   return {
     viewerId: "p1",
-    rules: { laneCount: 3, maxLanesPerRound: 1, maxRounds: 13, jackpotThreshold: 5 },
+    rules: {
+      laneCount: 3,
+      maxLanesPerRound: 1,
+      maxRounds: 13,
+      jackpotThreshold: 5,
+      sideHole: { minRoll: 6, minTarget: 1 },
+    },
     lanes: [buildLane(), buildLane(), buildLane()],
     players: [
       buildPlayer({

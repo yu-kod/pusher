@@ -15,7 +15,7 @@
  * 自分の手札は見えるが他人の手札は枚数しか見えないため、マスク結果はプレイヤーごとに
  * 異なる。`viewerId` を持たせて、どのプレイヤー向けのビューかを取り違えないようにする。
  */
-import type { Balance } from "./balance.js";
+import type { Balance, SideHoleRule } from "./balance.js";
 import type { Card } from "./deck.js";
 import type { GamePhase, GameState, PlayerId } from "./setup.js";
 
@@ -56,6 +56,13 @@ export type RulesView = {
   maxLanesPerRound: number;
   maxRounds: number;
   jackpotThreshold: number;
+  /**
+   * 横穴の発生条件（§5）。
+   *
+   * クライアントにルールを実装させないために返す。これが無いと画面側が
+   * 「目標値6以上なら危険」を自前で持つことになり、調整値を変えたときに嘘になる。
+   */
+  sideHole: SideHoleRule;
 };
 
 export type GameView = {
@@ -85,6 +92,7 @@ function rulesOf(config: Balance): RulesView {
     maxLanesPerRound: config.maxLanesPerRound,
     maxRounds: config.maxRounds,
     jackpotThreshold: config.jackpotThreshold,
+    sideHole: { ...config.sideHole },
   };
 }
 
