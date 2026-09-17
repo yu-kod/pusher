@@ -106,7 +106,7 @@ describe("setupGame", () => {
     it("各レーンの滞留に initialPendingCards 枚ずつ置く", () => {
       const state = setupGame(NAMES_4, createRng(1), buildConfig());
 
-      expect(state.lanes.map((l) => l.pending.length)).toEqual([5, 5, 5]);
+      expect(state.lanes.map((l) => l.pending.length)).toEqual([9, 9, 9]);
     });
 
     it("裏向きで置く（中身は誰にも見えない・docs/spec.md §8）", () => {
@@ -128,7 +128,7 @@ describe("setupGame", () => {
       const lane = state.lanes[0];
 
       expect(lane?.stock).toHaveLength(5);
-      expect(lane?.pending).toHaveLength(5);
+      expect(lane?.pending).toHaveLength(9);
     });
   });
 
@@ -268,12 +268,12 @@ describe("配布でイベントカードを引き直す（docs/spec.md ルール
   });
 
   it("コインカードが足りなければ例外を投げる", () => {
-    // 総枚数 55 は配布に足りる（50枚）が、コインは 15枚しかない。
-    // レーンと滞留に 30枚使ったあと、手札 20枚ぶんのコインは必ず尽きる
+    // 総枚数 75 は配布に足りる（62枚）が、コインは 15枚しかない。
+    // レーンと滞留に 42枚使ったあと、手札 20枚ぶんのコインは必ず尽きる
     const noCoins = buildConfig({
       deck: {
         coins: { 1: 15, 2: 0, 3: 0 },
-        events: { avalanche: 10, openLane: 10, extraSlot: 10, lottery: 10 },
+        events: { avalanche: 15, openLane: 15, extraSlot: 15, lottery: 15 },
       },
     });
 
@@ -285,9 +285,11 @@ describe("DEFAULT_BALANCE", () => {
   it("設計書どおりの既定値になっている（docs/spec.md §1 §2 §3）", () => {
     expect(DEFAULT_BALANCE.laneCount).toBe(3);
     expect(DEFAULT_BALANCE.initialLaneCards).toBe(5);
-    expect(DEFAULT_BALANCE.initialPendingCards).toBe(5);
+    expect(DEFAULT_BALANCE.initialPendingCards).toBe(9);
     expect(DEFAULT_BALANCE.initialHandSize).toBe(5);
     expect(DEFAULT_BALANCE.handLimit).toBeNull();
     expect(DEFAULT_BALANCE.maxRounds).toBe(13);
+    // 出目6は目標値によらず常に横穴（#67）
+    expect(DEFAULT_BALANCE.sideHole).toEqual({ minRoll: 6, minTarget: 1 });
   });
 });

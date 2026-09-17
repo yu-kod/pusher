@@ -33,21 +33,24 @@ describe("calculateTarget", () => {
   });
 });
 
+/** 既定の横穴条件（docs/spec.md §5）: 出目6は目標値によらず常に横穴 */
+const DEFAULT_SIDE_HOLE = DEFAULT_BALANCE.sideHole;
+
 describe("classifyRoll", () => {
   /**
    * docs/spec.md §3 §5 の判定を出目 1〜6 × 目標値 1〜8 で網羅する。
    *
    * - 出目 ≦ 目標値 → 成功
    * - 出目 > 目標値 → 失敗
-   * - 出目が 6 かつ 目標値が 6 以上 → 横穴（成功より優先）
+   * - 出目が 6 → 横穴（成功より優先。目標値を問わない）
    */
   const expected: Record<number, RollOutcome[]> = {
     // 目標値: [出目1, 出目2, 出目3, 出目4, 出目5, 出目6]
-    1: ["success", "failure", "failure", "failure", "failure", "failure"],
-    2: ["success", "success", "failure", "failure", "failure", "failure"],
-    3: ["success", "success", "success", "failure", "failure", "failure"],
-    4: ["success", "success", "success", "success", "failure", "failure"],
-    5: ["success", "success", "success", "success", "success", "failure"],
+    1: ["success", "failure", "failure", "failure", "failure", "sideHole"],
+    2: ["success", "success", "failure", "failure", "failure", "sideHole"],
+    3: ["success", "success", "success", "failure", "failure", "sideHole"],
+    4: ["success", "success", "success", "success", "failure", "sideHole"],
+    5: ["success", "success", "success", "success", "success", "sideHole"],
     6: ["success", "success", "success", "success", "success", "sideHole"],
     7: ["success", "success", "success", "success", "success", "sideHole"],
     8: ["success", "success", "success", "success", "success", "sideHole"],
@@ -57,32 +60,55 @@ describe("classifyRoll", () => {
     for (const [index, outcome] of outcomes.entries()) {
       const roll = index + 1;
       it(`目標値 ${target} で出目 ${roll} なら ${outcome}`, () => {
-        expect(classifyRoll(roll, Number(target))).toBe(outcome);
+        expect(classifyRoll(roll, Number(target), DEFAULT_SIDE_HOLE)).toBe(outcome);
       });
     }
   }
 
-  it("目標値が 6 以上でも出目 6 以外は横穴にならない", () => {
-    expect(classifyRoll(5, 9)).toBe("success");
+  it("出目 6 以外は横穴にならない", () => {
+    expect(classifyRoll(5, 9, DEFAULT_SIDE_HOLE)).toBe("success");
   });
 
-  it("目標値が 5 以下の出目 6 は横穴ではなく失敗", () => {
-    expect(classifyRoll(6, 5)).toBe("failure");
+  it("目標値が低くても出目 6 は横穴になる（逃げ道を作らない / #67）", () => {
+    expect(classifyRoll(6, 1, DEFAULT_SIDE_HOLE)).toBe("sideHole");
+    expect(classifyRoll(6, 5, DEFAULT_SIDE_HOLE)).toBe("sideHole");
   });
 
   it("成功率の上限は 83%（6分の5）に固定される（docs/spec.md §5）", () => {
-    const successes = [1, 2, 3, 4, 5, 6].filter((roll) => classifyRoll(roll, 100) === "success");
+    const successes = [1, 2, 3, 4, 5, 6].filter(
+      (roll) => classifyRoll(roll, 100, DEFAULT_SIDE_HOLE) === "success"
+    );
     expect(successes).toHaveLength(5);
   });
 
   it("出目が 1〜6 の範囲外なら例外を投げる", () => {
-    expect(() => classifyRoll(0, 3)).toThrow(RangeError);
-    expect(() => classifyRoll(7, 3)).toThrow(RangeError);
-    expect(() => classifyRoll(1.5, 3)).toThrow(RangeError);
+    expect(() => classifyRoll(0, 3, DEFAULT_SIDE_HOLE)).toThrow(RangeError);
+    expect(() => classifyRoll(7, 3, DEFAULT_SIDE_HOLE)).toThrow(RangeError);
+    expect(() => classifyRoll(1.5, 3, DEFAULT_SIDE_HOLE)).toThrow(RangeError);
   });
 
   it("目標値が 1 未満なら例外を投げる", () => {
-    expect(() => classifyRoll(1, 0)).toThrow(RangeError);
+    expect(() => classifyRoll(1, 0, DEFAULT_SIDE_HOLE)).toThrow(RangeError);
+  });
+});
+
+describe("classifyRoll — 横穴の条件を変えた場合（#67）", () => {
+  it("目標値の下限を 6 にすると、目標値5以下の出目6は失敗に戻る（#67 以前の既定）", () => {
+    const rule = { minRoll: 6, minTarget: 6 };
+
+    expect(classifyRoll(6, 6, rule)).toBe("sideHole");
+    expect(classifyRoll(6, 5, rule)).toBe("failure");
+    expect(classifyRoll(5, 5, rule)).toBe("success");
+  });
+
+  it("出目の下限を 5 にすると、出目5も横穴になり成功率の上限が 4/6 になる", () => {
+    const rule = { minRoll: 5, minTarget: 6 };
+
+    expect(classifyRoll(5, 6, rule)).toBe("sideHole");
+    expect(classifyRoll(6, 6, rule)).toBe("sideHole");
+    expect(classifyRoll(4, 6, rule)).toBe("success");
+    // 目標値が下限未満なら、出目5は通常どおり成功
+    expect(classifyRoll(5, 5, rule)).toBe("success");
   });
 });
 

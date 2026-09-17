@@ -11,6 +11,7 @@
  * **枚数しか使わない**。中身が見えるのは「横穴開放」で公開されたあとだけで、
  * そこは choosePending が受け取る。
  */
+import type { SideHoleRule } from "../game/balance.js";
 import { autoEventChooser } from "../game/chooser.js";
 import { isCoinCard, type CoinCard } from "../game/deck.js";
 import type { EventChooser } from "../game/resolve.js";
@@ -39,8 +40,6 @@ export type Strategy = EventChooser & {
  */
 const ESTIMATED_POINTS_PER_CARD = (30 * 1 + 27 * 2 + 19 * 3) / 90;
 
-/** 出目6が横穴になる目標値の下限（docs/spec.md §5） */
-const SIDE_HOLE_TARGET = 6;
 const D6_FACES = 6;
 
 /** 手番プレイヤーの手札のうち、投入できる（コインカードの）ものと添字 */
@@ -60,7 +59,7 @@ type LaneOption = {
   handIndex: number;
   /** 成功したときに得られる点数の期待値 */
   gain: number;
-  /** 横穴になりうるレーンか（目標値6以上） */
+  /** 横穴になりうるレーンか（目標値が sideHole.minTarget 以上） */
   risky: boolean;
 };
 
@@ -70,20 +69,26 @@ function evaluate(
   laneIndex: number,
   { card, handIndex }: HandEntry
 ): LaneOption {
+  const sideHole = state.config.sideHole;
   const target = card.coins + lane.pending.length;
-  const risky = target >= SIDE_HOLE_TARGET;
+  const risky = target >= sideHole.minTarget;
 
-  // 目標値6以上なら出目6は横穴なので成功率は 5/6 で頭打ち（§5）
-  const successRate = risky ? (D6_FACES - 1) / D6_FACES : target / D6_FACES;
+  // 横穴になる出目は成功に数えないので、成功率は (minRoll - 1) / 6 で頭打ち（§5）
+  const successes = Math.min(target, risky ? sideHole.minRoll - 1 : D6_FACES);
+  const successRate = successes / D6_FACES;
   // 押し込めるのは滞留にあるぶんだけ。投入した1枚も滞留に入る
   const pushed = Math.min(state.config.pushCount(card.coins), lane.pending.length + 1);
 
   return { laneIndex, handIndex, gain: successRate * pushed * ESTIMATED_POINTS_PER_CARD, risky };
 }
 
-/** k 本のリスクありレーンへ投入したときのバースト確率 1-(5/6)^k（docs/spec.md §3） */
-function bustProbability(riskyLanes: number): number {
-  return 1 - ((D6_FACES - 1) / D6_FACES) ** riskyLanes;
+/**
+ * k 本のリスクありレーンへ投入したときのバースト確率（docs/spec.md §3）。
+ *
+ * 1本あたり無事に済む確率は `(minRoll - 1) / 6` なので、k 本なら `1 - その k 乗`。
+ */
+function bustProbability(riskyLanes: number, sideHole: SideHoleRule): number {
+  return 1 - ((sideHole.minRoll - 1) / D6_FACES) ** riskyLanes;
 }
 
 /** 0 以上 max 未満の相異なる整数を count 個選ぶ */
@@ -157,7 +162,7 @@ export function expectedValueStrategy(): Strategy {
 
       const next = [...chosen, option];
       const gain = next.reduce((sum, c) => sum + c.gain, 0);
-      const bust = bustProbability(next.filter((c) => c.risky).length);
+      const bust = bustProbability(next.filter((c) => c.risky).length, state.config.sideHole);
 
       // 押し続ける条件（§3）。未確定得点が 0 なら右辺が 1 になり必ず通る
       if (bust >= gain / (gain + state.pendingPoints)) {

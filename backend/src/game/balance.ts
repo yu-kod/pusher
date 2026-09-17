@@ -10,6 +10,24 @@
  */
 import { DEFAULT_DECK_CONFIG, type DeckConfig } from "./deck.js";
 
+/**
+ * 横穴（バースト）の発生条件（docs/spec.md §5）。
+ *
+ * 横穴はチキンレース（§3）の引き際を決める唯一のリスクなので、この2つの数値が
+ * そのまま「押し引きの判断がいつ来るか」を決める。
+ *
+ *   押し続ける条件: バースト確率 ＜ 次の利得 ÷ (次の利得 ＋ 未確定得点)
+ *
+ * バースト確率 b のとき、降りるべき未確定得点は `利得 × (1 - b) ÷ b`。
+ * b が小さいほど判断が遠のき、手札が尽きるほうが先に来る（#67）。
+ */
+export type SideHoleRule = {
+  /** この出目以上が横穴になる。6 なら出目6だけ */
+  minRoll: number;
+  /** 目標値がこの値以上のときだけ横穴が起きる */
+  minTarget: number;
+};
+
 export type Balance = {
   // ---- 場の構成 ----
 
@@ -31,8 +49,10 @@ export type Balance = {
    * 実測では手番順ごとの勝率が 0.14 / 0.27 / 0.29 / 0.31 と壊れていた（#54）。
    * 開始時点から滞留があれば、全員が同じ条件で始められる。
    *
-   * 滞留の厚みの初期値そのものでもあるため、§7 最優先「滞留の厚み 3〜5枚」にも効く（#53）。
-   * → プリセット initialPending0（#54 以前の挙動）/ initialPending3 で比較する。
+   * 既定は 9。滞留の厚みは13ラウンドでは平衡に達せず、**初期値がそのまま
+   * ゲーム中の厚みを決める**（#67）。横穴を常時発生させると除去が増えて
+   * 厚みが 2.4 まで落ちるため、初期値で戻している。
+   * → プリセット initialPending0（#54 以前の挙動）/ initialPending3 / initialPending5 で比較する。
    */
   initialPendingCards: number;
 
@@ -142,6 +162,21 @@ export type Balance = {
    */
   pushCount: (totalCoins: number) => number;
 
+  // ---- 横穴 ----
+
+  /**
+   * 横穴の発生条件（§5）。
+   *
+   * §7 最優先「自分でやめた割合」に直結する。既定は「出目6は目標値によらず常に横穴」。
+   *
+   * #67 以前は「目標値6以上のとき出目6」だった。この条件では目標値5以下のレーンが
+   * **リスク 0 の逃げ道**になり、押し続けることに不利益がないため、手番は常に
+   * 手札切れで終わっていた（自分でやめた割合 0.01）。下限を外して逃げ道を無くすと
+   * 0.38 まで上がる。
+   * → プリセット sideHoleTarget6（#67 以前の既定）/ sideHoleTarget5 / sideHoleRoll5 で比較する。
+   */
+  sideHole: SideHoleRule;
+
   // ---- ジャックポット ----
 
   /** カウンターがこの値に達すると JP判定を行う（§5）。カウンターの上限でもある */
@@ -162,7 +197,7 @@ const LANE_COUNT = 3;
 export const DEFAULT_BALANCE: Balance = {
   laneCount: LANE_COUNT,
   initialLaneCards: 5,
-  initialPendingCards: 5,
+  initialPendingCards: 9,
   initialHandSize: 5,
   deck: DEFAULT_DECK_CONFIG,
 
@@ -175,6 +210,8 @@ export const DEFAULT_BALANCE: Balance = {
   rotateStartPlayer: true,
 
   pushCount: (totalCoins) => Math.ceil(totalCoins / 2),
+
+  sideHole: { minRoll: 6, minTarget: 1 },
 
   jackpotThreshold: 5,
   jackpotPayoutRatio: 1,
@@ -219,6 +256,8 @@ export const BALANCE_PRESETS = {
   initialPending0: { initialPendingCards: 0 },
   /** #53 #54: 初期滞留を 3 枚にする */
   initialPending3: { initialPendingCards: 3 },
+  /** #67 以前の既定: 初期滞留 5 枚（横穴を常時にすると厚みが 2.4 まで落ちる） */
+  initialPending5: { initialPendingCards: 5 },
 
   /** #54 以前の挙動: スタートプレイヤーを固定する */
   fixedStartPlayer: { rotateStartPlayer: false },
@@ -231,6 +270,13 @@ export const BALANCE_PRESETS = {
 
   /** §7: 1手番あたりの投入ラウンドを3回までに制限する */
   insertionRounds3: { maxInsertionRoundsPerTurn: 3 },
+
+  /** #67 以前の既定: 目標値6以上のときだけ出目6が横穴（やめた割合 0.01） */
+  sideHoleTarget6: { sideHole: { minRoll: 6, minTarget: 6 } },
+  /** #67: 下限を目標値5に下げる（逃げ道が細るだけでは 0.02 にしかならない） */
+  sideHoleTarget5: { sideHole: { minRoll: 6, minTarget: 5 } },
+  /** #67: 出目5も横穴にする。バースト確率が 2/6 になり、降りるべき点数がさらに下がる */
+  sideHoleRoll5: { sideHole: { minRoll: 5, minTarget: 1 } },
 } as const satisfies Record<string, Partial<Balance>>;
 
 export type PresetName = keyof typeof BALANCE_PRESETS;

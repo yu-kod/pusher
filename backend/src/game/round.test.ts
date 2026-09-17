@@ -98,12 +98,12 @@ describe("resolveInsertionRound（投入ラウンド）", () => {
   it("失敗したレーンからは何も落ちず、投入カードが滞留に残る（docs/spec.md §3）", () => {
     const state = buildState([1], [{ stock: [coin(3)] }]);
 
-    // 目標値 1。出目6 は目標値6未満なので横穴にならず、ただの失敗
+    // 目標値 1。出目5 は目標値を超えているので失敗（出目6は横穴になるので使わない）
     const result = resolveInsertionRound(
       state,
       [{ laneIndex: 0, handIndexes: [0] }],
       chooser,
-      scriptedRng([6])
+      scriptedRng([5])
     );
 
     expect(result.lanes[0]?.outcome).toBe("failure");
@@ -283,8 +283,24 @@ describe("resolveInsertionRound（投入ラウンド）", () => {
       expect(result.state.pendingPoints).toBeGreaterThan(9);
     });
 
-    it("目標値が6未満のレーンでは出目6でも横穴にならない（docs/spec.md §3）", () => {
+    it("目標値が低くても出目6なら横穴になる（docs/spec.md §5 / #67）", () => {
       const state = buildState([1], [{ stock: [coin(3)] }]);
+
+      const result = resolveInsertionRound(
+        state,
+        [{ laneIndex: 0, handIndexes: [0] }],
+        chooser,
+        scriptedRng([6])
+      );
+
+      expect(result.lanes[0]?.outcome).toBe("sideHole");
+      expect(result.busted).toBe(true);
+    });
+
+    it("横穴の下限を戻せば、目標値6未満の出目6は失敗になる（#67 以前の既定）", () => {
+      const state = buildState([1], [{ stock: [coin(3)] }], {
+        config: withPreset("sideHoleTarget6"),
+      });
 
       const result = resolveInsertionRound(
         state,

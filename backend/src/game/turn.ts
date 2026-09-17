@@ -4,6 +4,7 @@
  * 押し出しの解決（押し込み・落下・補充）は #9 で別に扱う。
  * ここでは「どのカードを滞留エリアへ入れるか」と「出目をどう判定するか」までを担う。
  */
+import type { SideHoleRule } from "./balance.js";
 import { isEventCard, type CoinCard } from "./deck.js";
 import type { GameState } from "./setup.js";
 
@@ -50,20 +51,20 @@ export function calculateTarget(totalCoins: number, pendingCountBeforeInsert: nu
 /**
  * 出目を判定する（docs/spec.md §3 §5）。
  *
- * - 出目が 6 かつ目標値が 6 以上 → 横穴（成功判定より優先する）
+ * - 出目が `sideHole.minRoll` 以上 かつ 目標値が `sideHole.minTarget` 以上 → 横穴（成功判定より優先する）
  * - 出目 ≦ 目標値 → 成功
  * - 出目 > 目標値 → 失敗
  *
- * 横穴を出目6に固定することで、目標値が6以上でも確定成功にならず、
- * 成功率の上限が 6分の5（約83%）に固定される。
+ * 高い出目を横穴に割り当てることで、目標値がいくら育っても確定成功にならず、
+ * 成功率に上限が付く。上限は `(minRoll - 1) / 6`。
  */
-export function classifyRoll(roll: number, target: number): RollOutcome {
+export function classifyRoll(roll: number, target: number, sideHole: SideHoleRule): RollOutcome {
   if (!Number.isInteger(roll) || roll < D6_MIN || roll > D6_MAX) {
     throw new RangeError(`出目は ${D6_MIN}〜${D6_MAX} の整数である必要がある: ${roll}`);
   }
   assertPositiveInt(target, "目標値");
 
-  if (roll === D6_MAX && target >= D6_MAX) {
+  if (roll >= sideHole.minRoll && target >= sideHole.minTarget) {
     return "sideHole";
   }
   return roll <= target ? "success" : "failure";

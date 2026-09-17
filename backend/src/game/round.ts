@@ -112,7 +112,7 @@ export function resolveInsertionRound(
   let current = inserted.state;
   const events: ResolvedEvent[] = [];
   const lanes = rolled.map(({ laneIndex, insertedCoins, target, roll }): LaneRoundResult => {
-    const outcome = classifyRoll(roll, target);
+    const outcome = classifyRoll(roll, target, state.config.sideHole);
     if (outcome === "failure") {
       // 投入カードは裏向きのまま滞留に残る（insertIntoLanes が裏向きで入れている）
       return { laneIndex, insertedCoins, target, roll, outcome, fallenCards: [] };
