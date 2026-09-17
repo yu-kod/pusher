@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { scriptedRng } from "../test-utils/rng.js";
 import { createRng } from "./rng.js";
-import { DEFAULT_BALANCE } from "./balance.js";
+import { DEFAULT_BALANCE, withPreset } from "./balance.js";
 import { setupGame, type GameState } from "./setup.js";
 import { applySideHole, canRollJackpot, rollJackpot, settleJackpotAtGameEnd } from "./jackpot.js";
 
@@ -174,14 +174,49 @@ describe("再判定の流れ（docs/spec.md §5）", () => {
 });
 
 describe("settleJackpotAtGameEnd", () => {
-  it("カウンターが 5 なら最後に横穴を出したプレイヤーが獲得する（docs/spec.md §5）", () => {
+  it("既定では、カウンターが 5 でも誰も獲得せず流れる（docs/spec.md §5 / #68）", () => {
     const base = buildState({ jackpotCounter: 5, jackpotPoints: 5 });
+    const state = { ...base, lastSideHolePlayerId: base.players[1]?.id ?? null };
+
+    const next = settleJackpotAtGameEnd(state);
+
+    expect(next.players.every((p) => p.points === 0)).toBe(true);
+    expect(next.jackpotPoints).toBe(0);
+  });
+
+  it("払い出す設定なら、最後に横穴を出したプレイヤーが獲得する（#68 以前の既定）", () => {
+    const base = buildState({
+      jackpotCounter: 5,
+      jackpotPoints: 5,
+      config: withPreset("payUnpaidJackpot"),
+    });
     const state = { ...base, lastSideHolePlayerId: base.players[1]?.id ?? null };
 
     const next = settleJackpotAtGameEnd(state);
 
     expect(next.players[1]?.points).toBe(5);
     expect(next.jackpotPoints).toBe(0);
+  });
+
+  it("払い出す設定でも、カウンターが 5 未満なら流れる（docs/spec.md §5）", () => {
+    const base = buildState({
+      jackpotCounter: 4,
+      jackpotPoints: 3,
+      config: withPreset("payUnpaidJackpot"),
+    });
+    const state = { ...base, lastSideHolePlayerId: base.players[1]?.id ?? null };
+
+    expect(settleJackpotAtGameEnd(state).players.every((p) => p.points === 0)).toBe(true);
+  });
+
+  it("払い出す設定でも、横穴を出した人がいなければ流れる", () => {
+    const state = buildState({
+      jackpotCounter: 5,
+      jackpotPoints: 3,
+      config: withPreset("payUnpaidJackpot"),
+    });
+
+    expect(settleJackpotAtGameEnd(state).players.every((p) => p.points === 0)).toBe(true);
   });
 
   it("カウンターが 5 未満なら誰も獲得せず流れる（docs/spec.md §5）", () => {

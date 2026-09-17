@@ -56,8 +56,18 @@ export type Balance = {
    */
   initialPendingCards: number;
 
-  /** セットアップで各プレイヤーに配る枚数（§2） */
+  /** セットアップで**先手**に配る枚数（§2） */
   initialHandSize: number;
+
+  /**
+   * 手番順が1つ後ろになるごとに、初期手札へ加える枚数（§2）。
+   *
+   * 既定は 1（先手5枚・2番手6枚・3番手7枚・4番手8枚）。先手はゲーム開始時に
+   * 積まれている滞留を万全の手札で刈れるぶん有利で、実測では勝率の差が
+   * 0.043〜0.067 あった。後手ほど弾薬を厚くすると 0.026〜0.028 に収まる（#68）。
+   * → プリセット noHandBonus（全員同じ枚数）で比較する。
+   */
+  initialHandBonusPerSeat: number;
 
   /**
    * デッキの構成（§1）。
@@ -183,6 +193,16 @@ export type Balance = {
   jackpotThreshold: number;
 
   /**
+   * ゲーム終了時、未払い出しのジャックポットを最後に横穴を出したプレイヤーへ払い出すか（§5）。
+   *
+   * 既定は false（流す）。横穴が常時発生するようになってプールが太くなった結果、
+   * この払い出しが**最終ラウンドで最後に打つ席への大きなボーナス**になっていた。
+   * 誰が最後に横穴を出すかは運でしかなく、手番順の偏りを 0.043 → 0.064 に広げていた（#68）。
+   * → プリセット payUnpaidJackpot（#68 以前の既定）で比較する。
+   */
+  payUnpaidJackpotAtGameEnd: boolean;
+
+  /**
    * JP当選時にプールから獲得する割合（§5）。
    *
    * §7 次点「ジャックポットの重さ：総取りが強すぎて他の努力が無意味にならないか。
@@ -199,6 +219,7 @@ export const DEFAULT_BALANCE: Balance = {
   initialLaneCards: 5,
   initialPendingCards: 9,
   initialHandSize: 5,
+  initialHandBonusPerSeat: 1,
   deck: DEFAULT_DECK_CONFIG,
 
   maxLanesPerRound: 1,
@@ -214,6 +235,7 @@ export const DEFAULT_BALANCE: Balance = {
   sideHole: { minRoll: 6, minTarget: 1 },
 
   jackpotThreshold: 5,
+  payUnpaidJackpotAtGameEnd: false,
   jackpotPayoutRatio: 1,
 };
 
@@ -248,6 +270,12 @@ export const BALANCE_PRESETS = {
   pushFull: { pushCount: (totalCoins: number) => totalCoins },
   /** §7: 押し込み枚数をコイン数 + 1 に増やす（滞留 0.83 枚。さらに薄くなる） */
   pushPlusOne: { pushCount: (totalCoins: number) => totalCoins + 1 },
+
+  /** #68 以前の既定: 全員に同じ枚数を配る（先手の勝率が 0.28 まで上がる） */
+  noHandBonus: { initialHandBonusPerSeat: 0 },
+
+  /** #68 以前の既定: ゲーム終了時、未払い出しのJPを最後に横穴を出した人へ払い出す */
+  payUnpaidJackpot: { payUnpaidJackpotAtGameEnd: true },
 
   /** §7 次点: JP当選時にプールの半分だけ獲得し、残りを次へ持ち越す */
   jackpotHalfCarryOver: { jackpotPayoutRatio: 0.5 },

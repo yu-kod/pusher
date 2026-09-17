@@ -59,12 +59,10 @@ describe("setupGame", () => {
       expect(state.players.every((p) => p.points === 0)).toBe(true);
     });
 
-    it("各プレイヤーに 5 枚ずつ配る（docs/spec.md §2）", () => {
+    it("先手に initialHandSize 枚を配る（docs/spec.md §2）", () => {
       const state = setupGame(NAMES_4, createRng(1), buildConfig());
 
-      for (const player of state.players) {
-        expect(player.hand).toHaveLength(5);
-      }
+      expect(state.players[0]?.hand).toHaveLength(5);
     });
   });
 
@@ -99,6 +97,28 @@ describe("setupGame", () => {
 
     it("進行中の状態で始まる", () => {
       expect(setupGame(NAMES_4, createRng(1), buildConfig()).phase).toBe("playing");
+    });
+  });
+
+  describe("初期手札の手番順ボーナス（docs/spec.md §2 / #68）", () => {
+    it("手番順が1つ後ろになるごとに1枚多く配る", () => {
+      const state = setupGame(NAMES_4, createRng(1), buildConfig());
+
+      expect(state.players.map((p) => p.hand.length)).toEqual([5, 6, 7, 8]);
+    });
+
+    it("3人でも同じように増える", () => {
+      const state = setupGame(["A", "B", "C"], createRng(1), buildConfig());
+
+      expect(state.players.map((p) => p.hand.length)).toEqual([5, 6, 7]);
+    });
+
+    it("0 にすれば全員同じ枚数になる", () => {
+      const config = { ...buildConfig(), initialHandBonusPerSeat: 0 };
+
+      expect(setupGame(NAMES_4, createRng(1), config).players.map((p) => p.hand.length)).toEqual([
+        5, 5, 5, 5,
+      ]);
     });
   });
 
@@ -139,7 +159,10 @@ describe("setupGame", () => {
 
       const dealt =
         config.laneCount * (config.initialLaneCards + config.initialPendingCards) +
-        4 * config.initialHandSize;
+        [0, 1, 2, 3].reduce(
+          (sum, seat) => sum + config.initialHandSize + seat * config.initialHandBonusPerSeat,
+          0
+        );
       expect(state.drawPile).toHaveLength(createDeck(config.deck).length - dealt);
     });
 
@@ -264,7 +287,7 @@ describe("配布でイベントカードを引き直す（docs/spec.md ルール
   it("配る枚数は変わらない", () => {
     const state = setupGame(NAMES_4, createRng(1), eventHeavy);
 
-    expect(state.players.map((p) => p.hand.length)).toEqual([5, 5, 5, 5]);
+    expect(state.players.map((p) => p.hand.length)).toEqual([5, 6, 7, 8]);
   });
 
   it("コインカードが足りなければ例外を投げる", () => {
@@ -287,9 +310,12 @@ describe("DEFAULT_BALANCE", () => {
     expect(DEFAULT_BALANCE.initialLaneCards).toBe(5);
     expect(DEFAULT_BALANCE.initialPendingCards).toBe(9);
     expect(DEFAULT_BALANCE.initialHandSize).toBe(5);
+    // 手番順が1つ後ろになるごとに1枚多く配る（#68）
+    expect(DEFAULT_BALANCE.initialHandBonusPerSeat).toBe(1);
     expect(DEFAULT_BALANCE.handLimit).toBeNull();
     expect(DEFAULT_BALANCE.maxRounds).toBe(13);
     // 出目6は目標値によらず常に横穴（#67）
     expect(DEFAULT_BALANCE.sideHole).toEqual({ minRoll: 6, minTarget: 1 });
+    expect(DEFAULT_BALANCE.payUnpaidJackpotAtGameEnd).toBe(false);
   });
 });
