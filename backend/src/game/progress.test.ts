@@ -253,11 +253,28 @@ describe("ゲーム終了（docs/spec.md §3）", () => {
     expect(result.state.phase).toBe("finished");
   });
 
-  it("終了時、カウンターが閾値なら最後に横穴を出したプレイヤーがジャックポットを獲得する（§5）", () => {
+  it("終了時、未払い出しのジャックポットは既定では流れる（§5 / #68）", () => {
     const base = buildState({
       round: DEFAULT_BALANCE.maxRounds,
       drawPile: plentyDrawPile(),
       jackpotCounter: DEFAULT_BALANCE.jackpotThreshold,
+      jackpotPoints: 15,
+    });
+    const state = { ...base, lastSideHolePlayerId: base.players[1]?.id ?? null };
+
+    const result = endRound(state, { ...noRolls, ...noShuffle }, chooser);
+
+    expect(result.state.players.every((p) => p.points === 0)).toBe(true);
+    expect(result.state.jackpotPoints).toBe(0);
+  });
+
+  it("払い出す設定なら、最後に横穴を出したプレイヤーが獲得する（#68 以前の既定）", () => {
+    const config = withPreset("payUnpaidJackpot");
+    const base = buildState({
+      config,
+      round: config.maxRounds,
+      drawPile: plentyDrawPile(),
+      jackpotCounter: config.jackpotThreshold,
       jackpotPoints: 15,
     });
     const state = { ...base, lastSideHolePlayerId: base.players[1]?.id ?? null };

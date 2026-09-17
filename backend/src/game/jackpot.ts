@@ -90,13 +90,14 @@ export function rollJackpot(state: GameState, rng: Pick<Rng, "rollD6">): Jackpot
 /**
  * ゲーム終了時、未払い出しのジャックポットを処理する（docs/spec.md §5）。
  *
- * カウンターが閾値に達していれば最後に横穴を出したプレイヤーが獲得する。
- * 達していなければ流れる（誰も獲得しない）。
+ * 既定では流れる（誰も獲得しない）。`payUnpaidJackpotAtGameEnd` を立てると、
+ * カウンターが閾値に達している場合にかぎり最後に横穴を出したプレイヤーが獲得する。
  */
 export function settleJackpotAtGameEnd(state: GameState): GameState {
-  const winnerIndex = canRollJackpot(state)
-    ? state.players.findIndex((p) => p.id === state.lastSideHolePlayerId)
-    : -1;
+  const winnerIndex =
+    state.config.payUnpaidJackpotAtGameEnd && canRollJackpot(state)
+      ? state.players.findIndex((p) => p.id === state.lastSideHolePlayerId)
+      : -1;
 
   // 横穴を出した人がいない（-1）なら流れる
   const players =

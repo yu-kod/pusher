@@ -93,7 +93,8 @@ const MAX_PLAYERS = 4;
  *
  * 1. メインデッキをシャッフルする
  * 2. 各レーンの奥に initialLaneCards 枚、滞留エリアに initialPendingCards 枚ずつ裏向きで配置する
- * 3. 各プレイヤーに initialHandSize 枚を配る。**イベントカードは引き直す**
+ * 3. 各プレイヤーに手札を配る。**イベントカードは引き直す**
+ *    枚数は手番順が後ろになるほど initialHandBonusPerSeat 枚ずつ増える（#68）
  * 4. ジャックポットカウンターを 0 に置く
  * 5. 残りを山札とする
  *
@@ -110,9 +111,13 @@ export function setupGame(playerNames: readonly string[], rng: Rng, config: Bala
 
   const deck = rng.shuffle(createDeck(config.deck));
 
+  /** 手番順 index のプレイヤーに配る枚数（後ろの席ほど多い・#68） */
+  const handSizeOf = (index: number): number =>
+    config.initialHandSize + index * config.initialHandBonusPerSeat;
+
   const required =
     config.laneCount * (config.initialLaneCards + config.initialPendingCards) +
-    playerNames.length * config.initialHandSize;
+    playerNames.reduce((sum, _name, index) => sum + handSizeOf(index), 0);
   if (deck.length < required) {
     throw new RangeError(
       `デッキが足りない: 配布に ${required} 枚必要だが ${deck.length} 枚しかない`
@@ -155,7 +160,7 @@ export function setupGame(playerNames: readonly string[], rng: Rng, config: Bala
   const players: Player[] = playerNames.map((name, index) => ({
     id: `p${index + 1}`,
     name,
-    hand: takeCoins(config.initialHandSize),
+    hand: takeCoins(handSizeOf(index)),
     points: 0,
   }));
 
