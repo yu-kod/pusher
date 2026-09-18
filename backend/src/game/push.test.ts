@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { Card } from "./deck.js";
+import type { Card, DeckCard } from "./deck.js";
 import { createRng } from "./rng.js";
 import { withPreset } from "./balance.js";
 import { setupGame, type GameState } from "./setup.js";
@@ -14,7 +14,11 @@ import { withPendingPoints } from "../test-utils/state.js";
  * 押し込み枚数の**式**は調整値なので balance.test.ts で検証する。ここでは
  * 「投入コイン数 = 押し込み枚数」に固定して、押し込みと落下の**順序と枚数の対応**だけを見る。
  */
-function buildState(options: { stock?: Card[]; pending?: Card[]; drawPile?: Card[] }): GameState {
+function buildState(options: {
+  stock?: Card[];
+  pending?: DeckCard[];
+  drawPile?: DeckCard[];
+}): GameState {
   const base = setupGame(["A", "B", "C"], createRng(1), withPreset("pushFull"));
   return {
     ...base,

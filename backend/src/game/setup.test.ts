@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createDeck, isCoinCard, isEventCard } from "./deck.js";
+import { createDeck, isBallCard, isCoinCard, isEventCard } from "./deck.js";
 import { createRng } from "./rng.js";
 import { DEFAULT_BALANCE, type Balance } from "./balance.js";
 import { setupGame } from "./setup.js";
@@ -172,12 +172,13 @@ describe("setupGame", () => {
       const config = buildConfig();
       const state = setupGame(NAMES_4, createRng(1), config);
 
+      // ボール札はデッキの外から来るので勘定に入れない（docs/turn-structure.md §4-3）
       const all = [
         ...state.drawPile,
         ...state.lanes.flatMap((l) => [...l.stock, ...l.pending.map((p) => p.card)]),
         ...state.players.flatMap((p) => p.hand),
         ...state.discardPile,
-      ];
+      ].filter((c) => !isBallCard(c));
 
       const countOf = (cards: typeof all) => {
         const map = new Map<string, number>();

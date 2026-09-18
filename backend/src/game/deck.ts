@@ -25,7 +25,29 @@ export type EventKind = (typeof EVENT_KINDS)[number];
 
 export type CoinCard = { kind: "coin"; coins: CoinCount };
 export type EventCard = { kind: "event"; event: EventKind };
-export type Card = CoinCard | EventCard;
+
+/**
+ * ボール札（`docs/turn-structure.md` §4-3）。
+ *
+ * **デッキには入らない。** レーンの奥の山にだけ1枚ずつ置かれ、落ちたらその場で
+ * 入れ替わる。手札にも山札にも捨て札にも現れないので、`createDeck` は関わらない。
+ *
+ * 得点は `balance.ballPoints` が持つ。カードに刻むと、調整のたびに場の全カードを
+ * 書き換えることになる。
+ */
+export type BallCard = { kind: "ball" };
+
+/**
+ * 山札・手札・捨て札に入りうるカード。
+ *
+ * ボール札は含まれない。**レーンの中にしか存在しない**ので、山札から引かれることも
+ * 手札に来ることもない。型で言い切っておけば、引いたカードを分岐するたびに
+ * 「ボール札だったら」を考えずに済む。
+ */
+export type DeckCard = CoinCard | EventCard;
+
+/** 場に存在しうるカード全部。レーンの中だけボール札が混ざる */
+export type Card = DeckCard | BallCard;
 
 export function isCoinCard(card: Card): card is CoinCard {
   return card.kind === "coin";
@@ -34,6 +56,17 @@ export function isCoinCard(card: Card): card is CoinCard {
 export function isEventCard(card: Card): card is EventCard {
   return card.kind === "event";
 }
+
+export function isBallCard(card: Card): card is BallCard {
+  return card.kind === "ball";
+}
+
+/** 山札へ戻せるカードか（ボール札はレーンの中にしか存在しない） */
+export function isDeckCard(card: Card): card is DeckCard {
+  return !isBallCard(card);
+}
+
+export const ball = (): BallCard => ({ kind: "ball" });
 
 /** デッキに何をどれだけ入れるか */
 export type DeckConfig = {
@@ -72,8 +105,8 @@ function assertCount(count: number, label: string): void {
  *
  * シャッフルはしない。呼び出し側が Rng で行う（エンジンに乱数を持ち込まないため）。
  */
-export function createDeck(config: DeckConfig): Card[] {
-  const deck: Card[] = [];
+export function createDeck(config: DeckConfig): DeckCard[] {
+  const deck: DeckCard[] = [];
 
   for (const coins of [1, 2, 3] as const) {
     const count = config.coins[coins];

@@ -8,7 +8,8 @@ import type { Balance } from "../game/balance.js";
 import { endRound, endTurn, determineWinners } from "../game/progress.js";
 import { bankPendingPoints, pendingPointsOf } from "../game/push.js";
 import type { Rng } from "../game/rng.js";
-import { resolveInsertionRound } from "../game/round.js";
+import { resolveInsertionRound, type InsertionRoundResult } from "../game/round.js";
+import { isBallCard } from "../game/deck.js";
 import { nextResolutionOrder, type RoundExit } from "../game/priority.js";
 import { setupGame, type GameState } from "../game/setup.js";
 import { resolveTick, type TickDeclaration } from "../game/tick.js";
@@ -56,7 +57,34 @@ export type GameStats = {
    * 全員が並んでソロプレイをしている。
    */
   sameLaneTicks: number;
+  /** ボール札が落ちた回数（`docs/turn-structure.md` §4-3）。使わない設定では 0 */
+  ballDrops: number;
+  /**
+   * ゲーム終了時に場にあるボール札の枚数。
+   *
+   * **常にレーン数と等しくなければならない。** ボール札が落ちる経路は押し出しと
+   * 「もう1枚落とす」（§6-3）の2つあり、片方でも入れ直しを忘れるとレーンから
+   * 静かに消える。盤面を見ない限り気づけないので、毎ゲーム数える。
+   */
+  finalBallCount: number;
+  /**
+   * ゲーム終了時のレーンの厚み（奥の山の枚数）。
+   *
+   * ボール札が落ちるたびにそのレーンは1枚厚くなる。取ったレーンがしばらく重くなる
+   * という負のフィードバックだが、際限なく膨らむなら入れ直す位置を変える必要がある。
+   */
+  finalLaneStock: number[];
 };
+
+/** いま場にあるボール札の枚数 */
+function countBalls(state: GameState): number {
+  return state.lanes.reduce((sum, lane) => sum + lane.stock.filter(isBallCard).length, 0);
+}
+
+/** 1投入ラウンドで落ちたボール札の枚数 */
+function ballDropsIn(round: InsertionRoundResult): number {
+  return round.lanes.reduce((sum, lane) => sum + lane.fallenCards.filter(isBallCard).length, 0);
+}
 
 /** そのラウンドで投入したレーンの、投入前の滞留枚数を拾う */
 function thicknessOf(state: GameState, laneIndexes: readonly number[]): number[] {
@@ -93,6 +121,7 @@ export function simulateGame(
     events: 0,
     voluntaryStops: 0,
     forcedStops: 0,
+    ballDrops: 0,
   };
   const pendingThickness: number[] = [];
   const lanesPerInsertion: number[] = [];
@@ -127,6 +156,7 @@ export function simulateGame(
         state = round.state;
         stats.insertionRounds++;
         stats.events += round.events.length;
+        stats.ballDrops += ballDropsIn(round);
         extraTurns += round.events.filter((e) => e.extraTurn).length;
         if (round.busted) {
           stats.busts++;
@@ -176,6 +206,8 @@ export function simulateGame(
     winnerSeats: state.players.flatMap((p, seat) => (winnerIds.has(p.id) ? [seat] : [])),
     ticks: 0,
     sameLaneTicks: 0,
+    finalLaneStock: state.lanes.map((lane) => lane.stock.length),
+    finalBallCount: countBalls(state),
   };
 }
 
@@ -221,6 +253,7 @@ function simulateTickGame(
     forcedStops: 0,
     ticks: 0,
     sameLaneTicks: 0,
+    ballDrops: 0,
   };
   const pendingThickness: number[] = [];
   const lanesPerInsertion: number[] = [];
@@ -299,6 +332,7 @@ function simulateTickGame(
       for (const { playerIndex, round } of tick.players) {
         stats.insertionRounds++;
         stats.events += round.events.length;
+        stats.ballDrops += ballDropsIn(round);
 
         if (round.busted) {
           // 未確定得点はジャックポットへ移り済み。このラウンドからは降りる
@@ -344,6 +378,8 @@ function simulateTickGame(
     stopPoints,
     finalPoints: state.players.map((p) => p.points),
     winnerSeats: state.players.flatMap((p, seat) => (winnerIds.has(p.id) ? [seat] : [])),
+    finalLaneStock: state.lanes.map((lane) => lane.stock.length),
+    finalBallCount: countBalls(state),
   };
 }
 
@@ -389,6 +425,10 @@ export type Summary = {
    * 同時進行では他人の解決を待つ回数がこれだけに減る。
    */
   avgTicksPerGame: number;
+  /** 1ゲームでボール札が落ちた回数（§4-3）。使わない設定では 0 */
+  avgBallDrops: number;
+  /** ゲーム終了時のレーンの厚み。ボール札が落ちるたびに1枚増える */
+  avgFinalLaneStock: number;
   /**
    * 同じレーンの取り合いが起きたティックの割合（§4-5）。
    *
@@ -437,6 +477,8 @@ export function summarize(stats: readonly GameStats[]): Summary {
       (_, seat) => stats.filter((s) => s.winnerSeats.includes(seat)).length / stats.length
     ),
     avgTicksPerGame: mean(stats.map((s) => s.ticks)),
+    avgBallDrops: mean(stats.map((s) => s.ballDrops)),
+    avgFinalLaneStock: mean(stats.flatMap((s) => s.finalLaneStock)),
     sameLaneRate: totalTicks === 0 ? 0 : sum(stats.map((s) => s.sameLaneTicks)) / totalTicks,
   };
 }

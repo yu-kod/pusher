@@ -3,7 +3,7 @@ import { coin, faceDown } from "../test-utils/cards.js";
 import { DEFAULT_BALANCE, withPreset } from "./balance.js";
 import { createRng } from "./rng.js";
 import { setupGame, type GameState } from "./setup.js";
-import type { Card } from "./deck.js";
+import type { EventCard } from "./deck.js";
 import type { EventChooser } from "./resolve.js";
 import { determineWinners, endRound, endTurn } from "./progress.js";
 import { scriptedRng } from "../test-utils/rng.js";
@@ -396,7 +396,7 @@ describe("determineWinners（勝敗判定・docs/spec.md §3）", () => {
 
 describe("ラウンド終了時に引いたイベント（docs/spec.md §6）", () => {
   const noShuffle = { shuffle: <T>(items: readonly T[]): T[] => [...items] };
-  const eventCard = (kind: "extraSlot" | "openLane" | "lottery"): Card => ({
+  const eventCard = (kind: "extraSlot" | "openLane" | "lottery"): EventCard => ({
     kind: "event",
     event: kind,
   });
