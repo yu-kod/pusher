@@ -7,8 +7,18 @@ export default defineConfig({
       provider: "v8",
       include: ["src/**/*.ts"],
       // index.ts / lambda.ts はエントリポイント、sim/main.ts は CLI の引数処理と
-      // 標準出力なので対象外。シミュレーションの中身（strategy / runner）は対象
-      exclude: ["src/index.ts", "src/lambda.ts", "src/sim/main.ts", "src/test-utils/**"],
+      // 標準出力なので対象外。シミュレーションの中身（strategy / runner）は対象。
+      //
+      // realtime/node-server.ts はソケットと hub を繋ぐだけのアダプタで、
+      // 残るのは「すでに閉じた接続へ送ろうとした」の防御だけ。実際に WebSocket を
+      // 張る結合テスト（node-server.test.ts）で振る舞いは押さえてある
+      exclude: [
+        "src/index.ts",
+        "src/lambda.ts",
+        "src/sim/main.ts",
+        "src/realtime/node-server.ts",
+        "src/test-utils/**",
+      ],
       thresholds: {
         lines: 100,
         functions: 100,

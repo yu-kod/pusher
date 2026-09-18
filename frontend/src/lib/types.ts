@@ -60,6 +60,13 @@ export type RoomPlayer = { id: string; name: string; isCpu: boolean };
 
 export type RoomView = {
   code: string;
+  /**
+   * サーバーが状態を更新した時刻（docs/realtime.md §3）。
+   *
+   * 同じ形の状態が HTTP のレスポンスと WebSocket の push の両方から届く。
+   * 経路が違えば追い越しが起きるので、手元より古いものを捨てる判断に使う。
+   */
+  rev: number;
   phase: "lobby" | "playing";
   players: RoomPlayer[];
   game: GameView | null;
