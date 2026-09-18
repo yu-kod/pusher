@@ -1,6 +1,8 @@
-import type { LaneView } from "@/lib/types";
+import type { CSSProperties } from "react";
+import type { Card, LaneView } from "@/lib/types";
 import { PlayingCard } from "./PlayingCard";
 import { cardLabel } from "@/lib/cards";
+import { PAYOUT_DRIFT, tossFrom } from "../cardFlight";
 
 const LANE_NAMES = ["左", "中央", "右"];
 
@@ -23,6 +25,10 @@ type Props = {
   selected: boolean;
   disabled: boolean;
   onSelect: () => void;
+  /** 本数。投入されたカードがどの向きから入ってくるかに使う */
+  laneCount: number;
+  /** いまこのレーンで起きたこと。カードが飛んでくる演出に使う */
+  flight?: { seq: number; card: Card; gained: number } | null;
 };
 
 /**
@@ -32,8 +38,19 @@ type Props = {
  * 滞留の厚みが圧力そのものなので、枚数を数字だけでなくカードの重なりでも
  * 見せる（§4-1）。中身は裏向きなので持たない。
  */
-export function Lane({ lane, index, target, risky, selected, disabled, onSelect }: Props) {
+export function Lane({
+  lane,
+  index,
+  target,
+  risky,
+  selected,
+  disabled,
+  onSelect,
+  laneCount,
+  flight = null,
+}: Props) {
   const name = LANE_NAMES[index] ?? String(index);
+  const toss = tossFrom(index, laneCount);
   const stockCards = Math.min(lane.stockCount, MAX_STOCK_CARDS);
   const pendingHeight = SMALL_CARD_HEIGHT + Math.max(lane.pending.length - 1, 0) * STACK_OFFSET;
 
@@ -44,7 +61,7 @@ export function Lane({ lane, index, target, risky, selected, disabled, onSelect 
       disabled={disabled}
       aria-pressed={selected}
       aria-label={`${name}レーン`}
-      className={`lane-tray flex flex-col items-center gap-1 rounded-lg border-2 px-1.5 pt-1.5 pb-2 transition ${
+      className={`lane-tray relative flex flex-col items-center gap-1 rounded-lg border-2 px-1.5 pt-1.5 pb-2 transition ${
         selected
           ? "-translate-y-0.5 border-amber-300 ring-2 ring-amber-300/60"
           : "border-black/40 hover:border-amber-200/40"
@@ -103,6 +120,34 @@ export function Lane({ lane, index, target, risky, selected, disabled, onSelect 
       {lane.hasExtraSlot && (
         <span className="rounded bg-sky-200 px-1 text-[10px] font-bold text-sky-900">
           投入口増設
+        </span>
+      )}
+
+      {/* 投入したカードが手札から入ってきて、落ちたぶんの得点が手元へ流れ出る */}
+      {flight !== null && (
+        <span className="pointer-events-none absolute inset-0 z-20" aria-hidden="true">
+          <span
+            key={`toss-${flight.seq}`}
+            data-testid="tossed-card"
+            className="animate-card-toss absolute top-[74px] left-1/2 -ml-5 block"
+            style={{ "--toss-x": `${toss.x}px`, "--toss-y": `${toss.y}px` } as CSSProperties}
+          >
+            <PlayingCard faceUp card={flight.card} size="sm" />
+          </span>
+          {flight.gained > 0 && (
+            <span
+              key={`gain-${flight.seq}`}
+              className="animate-payout-fly absolute bottom-6 left-1/2 -ml-6 w-12 rounded bg-amber-300 text-center text-[11px] font-bold text-amber-950"
+              style={
+                {
+                  "--payout-x": `${PAYOUT_DRIFT.x}px`,
+                  "--payout-y": `${PAYOUT_DRIFT.y}px`,
+                } as CSSProperties
+              }
+            >
+              +{flight.gained}点
+            </span>
+          )}
         </span>
       )}
 

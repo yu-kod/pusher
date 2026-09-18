@@ -45,8 +45,10 @@ describe("盤面", () => {
   it("ラウンドと手番とジャックポットを表示する", () => {
     setup(buildGame({ round: 4, jackpotPoints: 12, jackpotCounter: 3 }));
 
-    expect(screen.getByText("ラウンド 4 / 13")).toBeInTheDocument();
-    expect(screen.getByText(/^手番/)).toHaveTextContent("手番 あき");
+    // 手番は上の帯と、その人の席の両方に出る。ここでは帯のほうを見る
+    const banner = within(screen.getByRole("banner"));
+    expect(banner.getByText("ラウンド 4 / 13")).toBeInTheDocument();
+    expect(banner.getByText(/^手番/)).toHaveTextContent("手番 あき");
     expect(screen.getByText(/JP 12点/)).toBeInTheDocument();
     expect(screen.getByText("(3/5)")).toBeInTheDocument();
   });
@@ -124,6 +126,63 @@ describe("盤面", () => {
 
     expect(screen.getByText("30点")).toBeInTheDocument();
     expect(screen.getByText("手札4")).toBeInTheDocument();
+  });
+});
+
+describe("卓を囲む並び", () => {
+  const seatOf = (name: string) => screen.getByLabelText(`${name}の席`);
+
+  it("自分は手前に座る", () => {
+    setup();
+
+    expect(seatOf("あき")).toHaveAttribute("data-position", "bottom");
+    expect(within(seatOf("あき")).getByText("あなた")).toBeInTheDocument();
+  });
+
+  it("3人なら他の2人は自分を挟んで左右に座る", () => {
+    setup();
+
+    expect(seatOf("はると")).toHaveAttribute("data-position", "left");
+    expect(seatOf("CPU3")).toHaveAttribute("data-position", "right");
+  });
+
+  it("4人なら四方が埋まる", () => {
+    setup(
+      buildGame({
+        players: [
+          buildPlayer({ id: "p1", name: "あき", hand: { owner: true, cards: [coin(1)] } }),
+          buildPlayer({ id: "p2", name: "はると" }),
+          buildPlayer({ id: "p3", name: "CPU3" }),
+          buildPlayer({ id: "p4", name: "みなと" }),
+        ],
+      })
+    );
+
+    expect(seatOf("はると")).toHaveAttribute("data-position", "left");
+    expect(seatOf("CPU3")).toHaveAttribute("data-position", "top");
+    expect(seatOf("みなと")).toHaveAttribute("data-position", "right");
+  });
+
+  it("手番のプレイヤーの席が分かる", () => {
+    setup(buildGame({ currentPlayerIndex: 1 }));
+
+    expect(seatOf("はると")).toHaveAttribute("data-current", "true");
+    expect(seatOf("あき")).toHaveAttribute("data-current", "false");
+  });
+
+  it("観戦者からは全員が卓の向こうに見える", () => {
+    render(
+      <GameBoard
+        code={CODE}
+        game={buildGame()}
+        credentials={{ playerId: "unknown", token: "t9" }}
+        reload={vi.fn()}
+      />
+    );
+
+    expect(screen.getAllByTestId("seat")).toHaveLength(3);
+    expect(seatOf("あき")).toHaveAttribute("data-position", "top");
+    expect(screen.getByText("観戦中")).toBeInTheDocument();
   });
 });
 
@@ -241,6 +300,63 @@ describe("投入", () => {
     expect(screen.getByText(/目標値 4/)).toBeInTheDocument();
     expect(screen.getByText("成功")).toBeInTheDocument();
     expect(screen.getByText(/獲得/)).toHaveTextContent("獲得 2点");
+  });
+
+  it("投入したカードがそのレーンへ入っていく", async () => {
+    mockInsert();
+    const { user } = setup();
+
+    expect(screen.queryByTestId("tossed-card")).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "2コイン札" }));
+    await user.click(screen.getByRole("button", { name: "中央レーン" }));
+    await user.click(screen.getByRole("button", { name: "投入する" }));
+
+    const tossed = await screen.findByTestId("tossed-card");
+    expect(
+      within(screen.getByRole("button", { name: "中央レーン" })).getByTestId("tossed-card")
+    ).toBe(tossed);
+  });
+
+  it("落ちたぶんの得点が落下口から出てくる", async () => {
+    mockInsert();
+    const { user } = setup();
+
+    await user.click(screen.getByRole("button", { name: "1コイン札" }));
+    await user.click(screen.getByRole("button", { name: "左レーン" }));
+    await user.click(screen.getByRole("button", { name: "投入する" }));
+
+    expect(await screen.findByText("+2点")).toBeInTheDocument();
+  });
+
+  it("1枚も落ちなければ得点は出てこない", async () => {
+    mockInsert({
+      ...emptyResult,
+      lanes: [{ laneIndex: 0, roll: 5, outcome: "failure", target: 2 }],
+      gainedPoints: 0,
+    });
+    const { user } = setup();
+
+    await user.click(screen.getByRole("button", { name: "1コイン札" }));
+    await user.click(screen.getByRole("button", { name: "左レーン" }));
+    await user.click(screen.getByRole("button", { name: "投入する" }));
+
+    expect(await screen.findByTestId("tossed-card")).toBeInTheDocument();
+    expect(screen.queryByText(/^\+/)).not.toBeInTheDocument();
+  });
+
+  it("やめると飛んでいたカードも消える", async () => {
+    mockInsert();
+    const { user } = setup(buildGame({ insertionRoundsThisTurn: 1 }));
+
+    await user.click(screen.getByRole("button", { name: "1コイン札" }));
+    await user.click(screen.getByRole("button", { name: "左レーン" }));
+    await user.click(screen.getByRole("button", { name: "投入する" }));
+    expect(await screen.findByTestId("tossed-card")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "やめる" }));
+
+    await waitFor(() => expect(screen.queryByTestId("tossed-card")).not.toBeInTheDocument());
   });
 
   it("横穴を踏んだら知らせる（docs/spec.md §5）", async () => {
