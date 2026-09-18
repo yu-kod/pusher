@@ -331,6 +331,7 @@ export function GameBoard({ code, game, credentials, reload }: Props) {
               handCount={myHand.length}
               position="bottom"
               current={movingId === me.id}
+              currentLabel={phase === undefined ? undefined : "解決中"}
               isMe
               declared={phase === "declaring" ? (me.declared ?? false) : null}
             />
@@ -393,6 +394,8 @@ function SeatOf({
       handCount={player.hand.owner ? player.hand.cards.length : player.hand.count}
       position={seat.position}
       current={movingId === player.id}
+      // 3拍の進行に手番は無い。動いている席には、いま起きていることを添える
+      currentLabel={phase === undefined ? undefined : "解決中"}
       isMe={false}
       // 宣言の拍で出せるのは真偽値だけ。何を宣言したかは席に出さない（§8-3）
       declared={phase === "declaring" ? (player.declared ?? false) : null}

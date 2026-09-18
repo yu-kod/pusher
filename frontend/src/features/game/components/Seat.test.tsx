@@ -45,6 +45,13 @@ describe("Seat", () => {
     expect(screen.getByText("手番")).toBeInTheDocument();
   });
 
+  it("手番の無い進行では、その席で何が起きているかを言い換えられる", () => {
+    renderSeat({ current: true, currentLabel: "解決中" });
+
+    expect(screen.getByText("解決中")).toBeInTheDocument();
+    expect(screen.queryByText("手番")).not.toBeInTheDocument();
+  });
+
   it("手番でない席には印を出さない", () => {
     renderSeat({ current: false });
 

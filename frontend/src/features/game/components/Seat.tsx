@@ -8,8 +8,15 @@ type Props = {
   points: number;
   handCount: number;
   position: SeatPosition;
-  /** この席が手番か */
+  /** この席がいま動いているか */
   current: boolean;
+  /**
+   * 動いている席に添える言葉。
+   *
+   * 手番制なら「手番」。3拍の進行には手番が無いので、その席で何が起きているかを
+   * そのまま言う（「解決中」）。
+   */
+  currentLabel?: string;
   isMe: boolean;
   /**
    * 宣言を済ませたか。宣言の拍でないときは `null`。
@@ -26,7 +33,16 @@ type Props = {
  * 手札は裏向きの束と枚数だけで、**中身は一切持たない**（`docs/spec.md` §8）。
  * 枚数だけが公開情報なので、それ以上は画面にも渡さない。
  */
-export function Seat({ name, points, handCount, position, current, isMe, declared }: Props) {
+export function Seat({
+  name,
+  points,
+  handCount,
+  position,
+  current,
+  currentLabel = "手番",
+  isMe,
+  declared,
+}: Props) {
   const backs = Math.min(handCount, MAX_BACKS);
   const sideways = position === "left" || position === "right";
 
@@ -71,8 +87,8 @@ export function Seat({ name, points, handCount, position, current, isMe, declare
       </span>
 
       {current && (
-        <span className="rounded bg-amber-300 px-1.5 py-0.5 text-[10px] font-bold text-amber-950">
-          手番
+        <span className="rounded bg-amber-300 px-1.5 py-0.5 text-[10px] font-bold whitespace-nowrap text-amber-950">
+          {currentLabel}
         </span>
       )}
 
