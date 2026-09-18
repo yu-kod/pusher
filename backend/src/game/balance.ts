@@ -103,6 +103,15 @@ export type Balance = {
   progressMode: ProgressMode;
 
   /**
+   * 解決順を先行権で決めるか（`docs/turn-structure.md` §4-2）。
+   *
+   * false なら席順（スタートプレイヤーから左回り）。true なら「前のラウンドで
+   * 早く降りた順」になり、降りる判断そのものに報酬がつく。
+   * ティック同時進行でのみ意味を持つ。
+   */
+  useResolutionPriority: boolean;
+
+  /**
    * 1回の投入ラウンドで投入できるレーンの数（§3）。
    *
    * 既定は 1。#39 は「投入するレーン数をリスクの調整ダイヤルにする」設計だったが、
@@ -244,6 +253,7 @@ export const DEFAULT_BALANCE: Balance = {
   deck: DEFAULT_DECK_CONFIG,
 
   progressMode: "turn",
+  useResolutionPriority: false,
   maxLanesPerRound: 1,
   maxInsertionRoundsPerTurn: null,
   roundDrawCount: 3,
@@ -301,6 +311,18 @@ export const BALANCE_PRESETS = {
    * 滞留が厚くなる方向に動く。初期滞留の調整が要るかを測るためのプリセット。
    */
   tickMode: { progressMode: "tick" as const },
+
+  /**
+   * §9 段階2: ティック同時進行に先行権を足す。
+   *
+   * 先行権が席順を置き換えるので、スタートプレイヤーのラウンドごとの移動は止める
+   * （§4-2 — 順番は席で決まるものではなくなる）。
+   */
+  tickPriority: {
+    progressMode: "tick" as const,
+    useResolutionPriority: true,
+    rotateStartPlayer: false,
+  },
 
   /** #68 以前の既定: 全員に同じ枚数を配る（先手の勝率が 0.28 まで上がる） */
   noHandBonus: { initialHandBonusPerSeat: 0 },

@@ -9,6 +9,7 @@ import { endRound, endTurn, determineWinners } from "../game/progress.js";
 import { bankPendingPoints, pendingPointsOf } from "../game/push.js";
 import type { Rng } from "../game/rng.js";
 import { resolveInsertionRound } from "../game/round.js";
+import { nextResolutionOrder, type RoundExit } from "../game/priority.js";
 import { setupGame, type GameState } from "../game/setup.js";
 import { resolveTick, type TickDeclaration } from "../game/tick.js";
 import type { Strategy } from "./strategy.js";
@@ -233,13 +234,19 @@ function simulateTickGame(
     };
   };
 
+  // 先行権の順（§4-2）。初回は席順で、ラウンドごとに「早く降りた順」へ入れ替わる
+  let priority = Array.from({ length: playerCount }, (_, i) => i);
+
   while (state.phase === "playing") {
-    // ラウンド開始。スタートプレイヤーから順に並べる（先行権は #98 で入れ替える）
-    let active = Array.from(
-      { length: playerCount },
-      (_, i) => (state.startPlayerIndex + i) % playerCount
-    );
+    // ラウンド開始。先行権を使わないなら従来どおりスタートプレイヤーから左回り
+    let active = config.useResolutionPriority
+      ? [...priority]
+      : Array.from({ length: playerCount }, (_, i) => (state.startPlayerIndex + i) % playerCount);
     stats.turns += active.length;
+
+    // 誰が何ティック目にどう降りたか（§4-2 の材料）
+    const exits: RoundExit[] = [];
+    let tickIndex = 0;
 
     while (active.length > 0) {
       // ① 宣言 — 参加中の全員が**同じ盤面**を見て決める
@@ -268,6 +275,7 @@ function simulateTickGame(
       // 投入できる札が無い人はそのラウンドから降りる
       for (const playerIndex of cannotInsert) {
         stats.forcedStops++;
+        exits.push({ playerIndex, tick: tickIndex, forced: true });
         bank(playerIndex);
       }
       if (declarations.length === 0) {
@@ -275,6 +283,7 @@ function simulateTickGame(
       }
 
       // 取り合いが起きているか（§4-5 の新指標）
+      tickIndex++;
       stats.ticks++;
       const lanes = declarations.flatMap((d) => d.insertions.map((i) => i.laneIndex));
       if (new Set(lanes).size < lanes.length) {
@@ -295,16 +304,20 @@ function simulateTickGame(
           // 未確定得点はジャックポットへ移り済み。このラウンドからは降りる
           stats.busts++;
           stats.forcedStops++;
+          exits.push({ playerIndex, tick: tickIndex, forced: true });
           continue;
         }
         if (!round.canContinue) {
           stats.forcedStops++;
+          exits.push({ playerIndex, tick: tickIndex, forced: true });
           bank(playerIndex);
           continue;
         }
         if (!strategy.shouldContinue({ ...state, currentPlayerIndex: playerIndex }, rng)) {
           stats.voluntaryStops++;
           stopPoints.push(pendingPointsOf({ ...state, currentPlayerIndex: playerIndex }));
+          // 自分から降りた。これが次のラウンドの先行権になる（§4-2）
+          exits.push({ playerIndex, tick: tickIndex, forced: false });
           bank(playerIndex);
           continue;
         }
@@ -312,6 +325,8 @@ function simulateTickGame(
       }
       active = next;
     }
+
+    priority = nextResolutionOrder(priority, exits);
 
     const round = endRound(state, rng, strategy);
     state = round.state;
