@@ -50,18 +50,9 @@ export function createRealtimeHub(deps: RealtimeHubDeps): RealtimeHub {
   const fail = (connectionId: string, code: string, message: string) =>
     deps.send(connectionId, { t: "error", code, message });
 
-  /**
-   * 状態を1つの接続へ送る。
-   *
-   * `rev` は状態を更新した時刻。別経路（HTTP のレスポンス）との追い越しを
-   * クライアント側で捨てる判断に使う。
-   */
+  /** 状態を1つの接続へ送る。新しさの比較に使う rev は roomBody が持つ */
   const sendRoom = (connectionId: string, room: Room, playerId: string | null) =>
-    deps.send(connectionId, {
-      t: "room",
-      rev: room.updatedAt,
-      room: roomBody(room, playerId ?? SPECTATOR),
-    });
+    deps.send(connectionId, { t: "room", room: roomBody(room, playerId ?? SPECTATOR) });
 
   const greet = async (connectionId: string, code: RoomCode, token: string | undefined) => {
     const room = await deps.store.get(code);

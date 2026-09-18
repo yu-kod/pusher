@@ -663,6 +663,16 @@ describe("更新の配信（#15）", () => {
     return { app, published };
   }
 
+  it("HTTP でも WebSocket でも、同じ rev の付いた状態を返す", async () => {
+    const app = createApp({ store: createInMemoryRoomStore(), seed: 1, now: () => 1_700_000_000 });
+    const created = await post(app, "/api/rooms", { name: "A" });
+    const { code } = (await created.json()) as { code: string };
+
+    const res = await app.request(`/api/rooms/${code}`);
+
+    await expect(res.json()).resolves.toMatchObject({ rev: 1_700_000_000 });
+  });
+
   it("ルームを作ったら、その状態を配信する", async () => {
     const { app, published } = withPublish();
 

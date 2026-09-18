@@ -51,8 +51,7 @@ describe("createRealtimeHub", () => {
       });
       expect(send).toHaveBeenNthCalledWith(2, "c1", {
         t: "room",
-        rev: NOW,
-        room: expect.objectContaining({ code: CODE, phase: "lobby" }),
+        room: expect.objectContaining({ code: CODE, rev: NOW, phase: "lobby" }),
       });
     });
 
@@ -150,8 +149,14 @@ describe("createRealtimeHub", () => {
       await hub.publish(updated);
 
       expect(send).toHaveBeenCalledTimes(2);
-      expect(send).toHaveBeenCalledWith("c1", expect.objectContaining({ t: "room", rev: NOW + 5 }));
-      expect(send).toHaveBeenCalledWith("c2", expect.objectContaining({ t: "room", rev: NOW + 5 }));
+      expect(send).toHaveBeenCalledWith("c1", {
+        t: "room",
+        room: expect.objectContaining({ rev: NOW + 5 }),
+      });
+      expect(send).toHaveBeenCalledWith("c2", {
+        t: "room",
+        room: expect.objectContaining({ rev: NOW + 5 }),
+      });
     });
 
     it("接続ごとに、その人向けにマスクした状態を送る", async () => {

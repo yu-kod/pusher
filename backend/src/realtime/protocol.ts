@@ -25,8 +25,8 @@ export type ClientMessage =
 export type ServerMessage =
   /** hello を受理した。観戦者なら playerId は null */
   | { t: "welcome"; v: number; code: string; playerId: string | null }
-  /** この接続向けにマスク済みのスナップショット。rev は捨てる判断に使う */
-  | { t: "room"; rev: number; room: RoomBody }
+  /** この接続向けにマスク済みのスナップショット。新しさは room.rev で比べる */
+  | { t: "room"; room: RoomBody }
   | { t: "error"; code: string; message: string }
   | { t: "pong" };
 
