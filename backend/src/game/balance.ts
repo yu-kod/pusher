@@ -28,6 +28,15 @@ export type SideHoleRule = {
   minTarget: number;
 };
 
+/**
+ * 進行方式（`docs/turn-structure.md`）。
+ *
+ * - `turn` — 手番制。1人ずつ順に手番を行う（docs/spec.md §3 の v0.2 のルール）
+ * - `tick` — ティック同時進行。1ティックで参加中の全員が同時に1投入ラウンドを行い、
+ *   各自が自分のタイミングで降りる。解決は先行権順に1人ずつ
+ */
+export type ProgressMode = "turn" | "tick";
+
 export type Balance = {
   // ---- 場の構成 ----
 
@@ -80,6 +89,18 @@ export type Balance = {
   deck: DeckConfig;
 
   // ---- 手番とラウンド ----
+
+  /**
+   * 進行方式（`docs/turn-structure.md`）。
+   *
+   * 既定は `turn`（docs/spec.md §3 の手番制）。`tick` に切り替えると、
+   * 1ティックで参加中の全員が同時に1投入ラウンドを行う形になる。
+   *
+   * 手番制は待ち時間が全体の75%を占め（4人で1ゲーム 136.4 投入ラウンドを逐次解決）、
+   * `docs/design-notes.md` §4 がダウンタイムの問題として挙げている。
+   * → プリセット tickMode で比較する。
+   */
+  progressMode: ProgressMode;
 
   /**
    * 1回の投入ラウンドで投入できるレーンの数（§3）。
@@ -222,6 +243,7 @@ export const DEFAULT_BALANCE: Balance = {
   initialHandBonusPerSeat: 1,
   deck: DEFAULT_DECK_CONFIG,
 
+  progressMode: "turn",
   maxLanesPerRound: 1,
   maxInsertionRoundsPerTurn: null,
   roundDrawCount: 3,
@@ -270,6 +292,15 @@ export const BALANCE_PRESETS = {
   pushFull: { pushCount: (totalCoins: number) => totalCoins },
   /** §7: 押し込み枚数をコイン数 + 1 に増やす（滞留 0.83 枚。さらに薄くなる） */
   pushPlusOne: { pushCount: (totalCoins: number) => totalCoins + 1 },
+
+  /**
+   * `docs/turn-structure.md` の本命案: ティック同時進行に切り替える。
+   *
+   * 1ティックで参加中の全員が同時に1投入ラウンドを行い、解決は1人ずつ順に。
+   * 待ち時間の割合が下がるかわりに、1ティックで最大4枚が投入されるので
+   * 滞留が厚くなる方向に動く。初期滞留の調整が要るかを測るためのプリセット。
+   */
+  tickMode: { progressMode: "tick" as const },
 
   /** #68 以前の既定: 全員に同じ枚数を配る（先手の勝率が 0.28 まで上がる） */
   noHandBonus: { initialHandBonusPerSeat: 0 },

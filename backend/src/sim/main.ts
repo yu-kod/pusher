@@ -81,6 +81,10 @@ function format(summary: Summary): string {
     `投入1枚の回収         ${round(summary.pointsPerInsertedCard)}  (絶対値に目標はない)`,
     `1ゲームのイベント数   ${round(summary.avgEventsPerGame)}`,
     `手番順ごとの勝率      ${summary.seatWinRates.map(round).join(" / ")}`,
+    "",
+    "ティック同時進行（docs/turn-structure.md §4-1・手番制では 0）",
+    `  1ゲームのティック数 ${round(summary.avgTicksPerGame)}  (待ち時間の指標)`,
+    `  レーンの取り合い率  ${round(summary.sameLaneRate)}  (0 なら並んでソロプレイ)`,
   ].join("\n");
 }
 
