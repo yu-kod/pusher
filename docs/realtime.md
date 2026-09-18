@@ -231,18 +231,56 @@ backend/src/realtime/
 
 ## 7. 本番（API Gateway WebSocket API）への展開
 
-ローカルで動く形が先にあり、本番はそのアダプタを差し替える。**本番化は #15 では行わない。**
+ローカルで動く形が先にあり、本番はそのアダプタを差し替える。**#90 で実装した。**
 
-理由: 接続レジストリを Lambda 間で共有するには DynamoDB が要るが、
-ルーム本体の保存がまだインメモリ（`backend/src/room/store.ts`）で、テーブルが1つも無い（#78）。
-接続だけ先に DynamoDB へ載せても、ルーム状態が Lambda ごとにばらつく以上、意味がない。
+ルーム本体の保存が DynamoDB に載った（#78）ので、接続レジストリを Lambda 間で
+共有できるようになった。入っているのはこれだけ。
 
-**ルームの保存を DynamoDB にする作業と同じ単位で行う。** そのとき必要になるのは:
+| ローカル開発 | 本番 |
+|---|---|
+| Node の `ws` サーバー（`realtime/node-server.ts`） | API Gateway WebSocket API（`realtime/ws-handler.ts`） |
+| ソケットへ直接 `send` | `PostToConnection`（`realtime/apigw-send.ts`） |
+| プロセス内の `Map`（`realtime/registry.ts`） | DynamoDB（`realtime/dynamo-registry.ts`） |
 
-- `aws_apigatewayv2_api`（`protocol_type = "WEBSOCKET"`）と `$connect` / `$disconnect` / `$default` ルート
-- 接続テーブル: `PK = CONN#<connectionId>` / ルームからの逆引き GSI（`ROOM#<code>`）、TTL つき
-- Lambda に `execute-api:ManageConnections` の権限
-- `PostToConnection` が `410 Gone` を返したらレジストリから消す（切断イベントの取りこぼし対策）
+`hub.ts` はどちらの場合も同じものを使う。変わるのは `send` とレジストリだけ。
+
+### ルートは3つ
+
+| ルート | すること |
+|---|---|
+| `$connect` | 受け入れるだけ |
+| `$default` | `hello` / `ping` を hub へ |
+| `$disconnect` | レジストリから消す |
+
+紐づけを `$connect` ではなく `hello` で行うのは、繋いだ時点ではルームコードも
+トークンも分からないため。クエリ文字列にトークンを載せる形にもしない。
+URL はプロキシやログに残るのに対し、本文は残らない。
+
+`$connect` 以外で 2xx 以外を返すと API Gateway は接続を切るので、
+読めないメッセージや送信の失敗でも 200 を返す。エラーは `error` メッセージで伝える。
+
+### 接続の掃除は3重
+
+`$disconnect` は取りこぼしうる。そこで、
+
+1. `$disconnect` で消す
+2. 配信時に `PostToConnection` が `410 Gone` を返したら消す（`hub.ts`）
+3. それでも残ったものは TTL（2時間）で消える。API Gateway の接続自体が最長2時間
+
+### 繋ぎ先は CloudFront を通さない
+
+フロントは `VITE_WS_URL`（Terraform の `websocket_url`）へ直接繋ぐ。
+`/api/*` と違って CloudFront 経由にしていないのは、**WebSocket API が接続 URL に
+ステージ名より後ろのパスを許さない**ため。`/ws` を通すには CloudFront Function で
+URI を書き換える必要があり、経路が1つ増える割に得るものが無い。
+
+渡されていなければ同じホストの `/ws` へ繋ぐ（ローカル開発）。
+繋がらなければポーリングのままになるだけで、遊べなくはならない（§5）。
+
+### AWS SDK はバンドルする
+
+Lambda のランタイムにも SDK は入っているが、どのクライアントが入っているかは
+ランタイムの更新に左右される。`esbuild` で関数のコードに含める（`build:lambda`）。
 
 ---
 

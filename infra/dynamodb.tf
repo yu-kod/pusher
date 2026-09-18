@@ -4,7 +4,7 @@
 # バラバラのメモリ上にあり、本番でオンライン対戦が成立しない。
 #
 # 汎用キー名（PK / SK）にプレフィックス付きの値を入れる単一テーブル設計。
-# WebSocket の接続レジストリ（#15 の本番化）が同じテーブルに乗る。
+# WebSocket の接続レジストリ（#90）が同じテーブルに乗る。
 #
 #   | 項目   | PK                     | SK     | GSI1PK        | GSI1SK        |
 #   |--------|------------------------|--------|---------------|---------------|
@@ -43,8 +43,11 @@ resource "aws_dynamodb_table" "app" {
     name      = "GSI1"
     hash_key  = "GSI1PK"
     range_key = "GSI1SK"
-    # 逆引きで要るのは相手のキーだけ（接続 ID）。属性を運ばない分だけ安い
-    projection_type = "KEYS_ONLY"
+    # 逆引きで要るのは接続 ID と、その接続が誰向けか（playerId）。
+    # 配信は接続ごとにマスク済みの別ペイロードを作るので、誰向けかが分からないと
+    # もう1回読み直すことになる（docs/realtime.md §4）
+    projection_type    = "INCLUDE"
+    non_key_attributes = ["playerId"]
   }
 
   # アカウントの無いサービスなのでデータを溜め込まない。

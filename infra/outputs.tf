@@ -32,3 +32,13 @@ output "app_table_name" {
   description = "ルームの状態を入れる DynamoDB テーブル名"
   value       = aws_dynamodb_table.app.name
 }
+
+output "websocket_url" {
+  description = "ルーム更新の通知を受け取る WebSocket のエンドポイント（フロントの VITE_WS_URL）"
+  value       = aws_apigatewayv2_stage.ws.invoke_url
+}
+
+output "ws_lambda_function_name" {
+  description = "WebSocket API の Lambda 関数名"
+  value       = aws_lambda_function.ws.function_name
+}
