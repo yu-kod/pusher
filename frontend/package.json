@@ -11,7 +11,8 @@
     "lint": "eslint src/",
     "typecheck": "tsc --noEmit",
     "format": "prettier --write src/",
-    "format:check": "prettier --check src/"
+    "format:check": "prettier --check src/",
+    "build:demo": "vite build --config vite.demo.config.ts"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.3.2",

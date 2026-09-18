@@ -37,6 +37,28 @@
     0 1px 0 rgba(255, 255, 255, 0.18);
 }
 
+/* プッシャー台の筐体。台の外はゲームセンターの暗がりにしておく */
+.pusher-cabinet {
+  background-color: #070b12;
+  background-image:
+    radial-gradient(ellipse 80% 45% at 50% 34%, rgba(56, 189, 248, 0.16), transparent 70%),
+    radial-gradient(ellipse 70% 40% at 50% 92%, rgba(251, 191, 36, 0.14), transparent 70%);
+}
+
+@keyframes burst-rise {
+  from {
+    transform: translate(-50%, 4px);
+  }
+  to {
+    transform: translate(-50%, -22px);
+  }
+}
+
+/* 落ちた瞬間の得点表示。浮き上がりながら消える */
+.pusher-burst {
+  animation: burst-rise 900ms ease-out both;
+}
+
 @keyframes card-drop {
   from {
     transform: translateY(-14px) rotate(-4deg);
@@ -86,5 +108,14 @@
   .animate-die-roll,
   .animate-slide-up {
     animation: none;
+  }
+
+  /*
+   * 台そのものの往復はこの画面の中身なので止めない。
+   * 止めるのは、読む必要のない飾りの動きだけにする。
+   */
+  .pusher-burst {
+    animation: none;
+    transform: translate(-50%, -14px);
   }
 }

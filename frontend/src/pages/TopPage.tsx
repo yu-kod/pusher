@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { createRoom, joinRoom } from "@/lib/api";
 import { saveCredentials } from "@/lib/session";
 import { ErrorMessage } from "@/components/ErrorMessage";
@@ -121,6 +121,15 @@ export function TopPage() {
             参加する
           </button>
         </form>
+
+        <p className="mt-8 text-center">
+          <Link
+            to="/pusher"
+            className="text-xs text-emerald-50/60 underline underline-offset-4 hover:text-amber-200"
+          >
+            プッシャー台の動きを見る（試作）
+          </Link>
+        </p>
       </div>
     </main>
   );

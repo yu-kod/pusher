@@ -1,0 +1,8 @@
+/*
+ * 試作を単体で書き出すときのスタイル入口。
+ *
+ * Tailwind v4 はビルドの root からクラスを探すので、root が `demo/` のこのビルドでは
+ * `src/` を見てくれない。`@source` で明示的に指す。
+ */
+@import "../src/index.css";
+@source "../src";
