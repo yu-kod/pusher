@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { createApp } from "../app.js";
+import type { Room } from "../room/room.js";
 import { createInMemoryRoomStore } from "../room/store.js";
 
 /** ルームを1つ作り、参加者を揃えたアプリとコードを返す */
@@ -644,5 +645,81 @@ describe("DELETE /api/rooms/:code/players/:id（CPU の削除）", () => {
       { id: "p1", name: "あなた", isCpu: false },
       { id: "p3", name: "CPU2", isCpu: true },
     ]);
+  });
+});
+
+describe("更新の配信（#15）", () => {
+  /** 配信された Room を順に記録するアプリを作る */
+  function withPublish() {
+    const published: Room[] = [];
+    const app = createApp({
+      store: createInMemoryRoomStore(),
+      seed: 1,
+      publish: (room) => {
+        published.push(room);
+        return Promise.resolve();
+      },
+    });
+    return { app, published };
+  }
+
+  it("ルームを作ったら、その状態を配信する", async () => {
+    const { app, published } = withPublish();
+
+    await post(app, "/api/rooms", { name: "A" });
+
+    expect(published).toHaveLength(1);
+    expect(published[0]?.players).toEqual([expect.objectContaining({ name: "A" })]);
+  });
+
+  it("誰かが参加したら、そのルームの状態を配信する", async () => {
+    const { app, published } = withPublish();
+    const created = await post(app, "/api/rooms", { name: "A" });
+    const { code } = (await created.json()) as { code: string };
+
+    await post(app, `/api/rooms/${code}/players`, { name: "B" });
+
+    expect(published[1]?.players.map((p) => p.name)).toEqual(["A", "B"]);
+  });
+
+  it("ゲームを開始したら、開始後の状態を配信する", async () => {
+    const { app, published } = withPublish();
+    const created = await post(app, "/api/rooms", { name: "A" });
+    const { code, token } = (await created.json()) as { code: string; token: string };
+    await post(app, `/api/rooms/${code}/players`, { name: "B" });
+    await post(app, `/api/rooms/${code}/players`, { name: "C" });
+
+    await post(app, `/api/rooms/${code}/start`, {}, token);
+
+    expect(published[published.length - 1]?.phase).toBe("playing");
+  });
+
+  it("配信の元になるのはサーバーの完全な状態で、マスクは配信側が行う", async () => {
+    const { app, published } = withPublish();
+
+    await post(app, "/api/rooms", { name: "A" });
+
+    // トークンを含む Room をそのまま渡す。誰向けに削るかは hub が接続ごとに決める
+    expect(published[0]?.players[0]?.token).toEqual(expect.any(String));
+  });
+
+  it("配信に失敗してもアクションは成功のまま返す", async () => {
+    const app = createApp({
+      store: createInMemoryRoomStore(),
+      seed: 1,
+      publish: () => Promise.reject(new Error("配信先が落ちている")),
+    });
+
+    const res = await post(app, "/api/rooms", { name: "A" });
+
+    expect(res.status).toBe(201);
+  });
+
+  it("失敗したアクションでは配信しない", async () => {
+    const { app, published } = withPublish();
+
+    await post(app, "/api/rooms", { name: "" });
+
+    expect(published).toEqual([]);
   });
 });
