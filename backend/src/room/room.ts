@@ -10,6 +10,7 @@
 import type { Balance } from "../game/balance.js";
 import type { Rng } from "../game/rng.js";
 import { setupGame, type GameState, type PlayerId } from "../game/setup.js";
+import { startTickSession, type TickSession } from "./tick-session.js";
 
 /**
  * ルームコードに使う文字。
@@ -48,6 +49,13 @@ export type Room = {
   players: RoomPlayer[];
   /** ゲーム開始後のみ入る */
   game: GameState | null;
+  /**
+   * いま何拍目で、誰が宣言を済ませたか（`docs/realtime.md` §8）。
+   *
+   * ゲーム開始後のみ入る。ルールそのものではなく「同時に届く入力をどう受け、
+   * いつ締め切るか」を持つ。
+   */
+  tick: TickSession | null;
   createdAt: number;
   updatedAt: number;
 };
@@ -60,7 +68,15 @@ export function generateRoomCode(rng: Pick<Rng, "nextInt">): RoomCode {
 }
 
 export function createRoom(code: RoomCode, now: number): Room {
-  return { code, phase: "lobby", players: [], game: null, createdAt: now, updatedAt: now };
+  return {
+    code,
+    phase: "lobby",
+    players: [],
+    game: null,
+    tick: null,
+    createdAt: now,
+    updatedAt: now,
+  };
 }
 
 export type JoinRequest = {
@@ -105,14 +121,17 @@ export function startGame(room: Room, rng: Rng, config: Balance, now: number): R
     throw new RangeError(`${MIN_PLAYERS}〜4人で開始する必要がある: ${room.players.length} 人`);
   }
 
+  const game = setupGame(
+    room.players.map((p) => p.name),
+    rng,
+    config
+  );
+
   return {
     ...room,
     phase: "playing",
-    game: setupGame(
-      room.players.map((p) => p.name),
-      rng,
-      config
-    ),
+    game,
+    tick: startTickSession(game, now),
     updatedAt: now,
   };
 }
