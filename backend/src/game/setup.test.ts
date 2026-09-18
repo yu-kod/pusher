@@ -14,15 +14,28 @@ const NAMES_4 = [...NAMES_3, "Dave"];
 describe("setupGame", () => {
   describe("レーン", () => {
     it("設定した本数のレーンを作る", () => {
+      const shallow = { initialLaneCards: 5, initialPendingCards: 5 };
+
       expect(setupGame(NAMES_4, createRng(1), buildConfig()).lanes).toHaveLength(3);
-      expect(setupGame(NAMES_4, createRng(1), buildConfig({ laneCount: 4 })).lanes).toHaveLength(4);
+      expect(
+        setupGame(NAMES_4, createRng(1), buildConfig({ ...shallow, laneCount: 4 })).lanes
+      ).toHaveLength(4);
     });
 
-    it("各レーンの奥に 5 枚ずつ配る（docs/spec.md §2）", () => {
+    it("v0.3 の深さではレーン4本を配りきれない（docs/spec.md §7）", () => {
+      // 4 × (奥12 + 滞留9) + 手札26 = 110 枚。デッキは104枚しかない。
+      // 「レーン3本が適正か」を4本と比べ直すには、先にデッキを増やす必要がある
+      expect(() => setupGame(NAMES_4, createRng(1), buildConfig({ laneCount: 4 }))).toThrow(
+        /デッキが足りない/
+      );
+    });
+
+    it("各レーンの奥に 13 枚ずつ配る（通常札12＋ボール札1・docs/spec.md §2）", () => {
       const state = setupGame(NAMES_4, createRng(1), buildConfig());
 
       for (const lane of state.lanes) {
-        expect(lane.stock).toHaveLength(5);
+        expect(lane.stock).toHaveLength(13);
+        expect(lane.stock.filter(isBallCard)).toHaveLength(1);
       }
     });
 
@@ -149,7 +162,7 @@ describe("setupGame", () => {
       const state = setupGame(NAMES_4, createRng(1), buildConfig());
       const lane = state.lanes[0];
 
-      expect(lane?.stock).toHaveLength(5);
+      expect(lane?.stock).toHaveLength(13);
       expect(lane?.pending).toHaveLength(9);
     });
   });
@@ -244,7 +257,7 @@ describe("setupGame", () => {
 describe("配布でイベントカードを引き直す（docs/spec.md ルール解釈メモ）", () => {
   /** イベントの比率を上げて、引き直しが必ず起きる状況を作る */
   const eventHeavy = buildConfig({
-    deck: { coins: { 1: 60, 2: 0, 3: 0 }, events: { ...DEFAULT_BALANCE.deck.events } },
+    deck: { coins: { 1: 80, 2: 0, 3: 0 }, events: { ...DEFAULT_BALANCE.deck.events } },
   });
 
   it("どのプレイヤーの手札にもイベントカードが入らない", () => {
@@ -265,12 +278,13 @@ describe("配布でイベントカードを引き直す（docs/spec.md ルール
     const config = buildConfig();
     const state = setupGame(NAMES_4, createRng(3), config);
 
+    // ボール札はデッキから配るものではないので数えない（§1「ボール札」）
     const all = [
       ...state.drawPile,
       ...state.lanes.flatMap((l) => [...l.stock, ...l.pending.map((p) => p.card)]),
       ...state.players.flatMap((p) => p.hand),
       ...state.discardPile,
-    ];
+    ].filter((card) => !isBallCard(card));
 
     expect(all).toHaveLength(createDeck(config.deck).length);
   });
@@ -294,12 +308,12 @@ describe("配布でイベントカードを引き直す（docs/spec.md ルール
   });
 
   it("コインカードが足りなければ例外を投げる", () => {
-    // 総枚数 75 は配布に足りる（62枚）が、コインは 15枚しかない。
-    // レーンと滞留に 42枚使ったあと、手札 20枚ぶんのコインは必ず尽きる
+    // 総枚数 115 は配布に足りる（89枚）が、コインは 15枚しかない。
+    // レーンと滞留に 63枚使ったあと、手札 26枚ぶんのコインは必ず尽きる
     const noCoins = buildConfig({
       deck: {
         coins: { 1: 15, 2: 0, 3: 0 },
-        events: { avalanche: 15, openLane: 15, extraSlot: 15, lottery: 15 },
+        events: { avalanche: 25, openLane: 25, extraSlot: 25, lottery: 25 },
       },
     });
 
@@ -310,7 +324,7 @@ describe("配布でイベントカードを引き直す（docs/spec.md ルール
 describe("DEFAULT_BALANCE", () => {
   it("設計書どおりの既定値になっている（docs/spec.md §1 §2 §3）", () => {
     expect(DEFAULT_BALANCE.laneCount).toBe(3);
-    expect(DEFAULT_BALANCE.initialLaneCards).toBe(5);
+    expect(DEFAULT_BALANCE.initialLaneCards).toBe(12);
     expect(DEFAULT_BALANCE.initialPendingCards).toBe(9);
     expect(DEFAULT_BALANCE.initialHandSize).toBe(5);
     // 手番順が1つ後ろになるごとに1枚多く配る（#68）

@@ -48,7 +48,9 @@ describe("playCpuTurns", () => {
   });
 
   it("CPU の手札が減る", () => {
-    const room = startedRoom([false, true, true]);
+    // ラウンドをまたぐと終了時のドローで手札が戻るので、CPU 1人ぶんだけ進めて測る。
+    // 深いレーン（v0.3）では CPU が早めに降りるので、1手番で使う枚数はドロー3枚より少ない
+    const room = startedRoom([false, true, false]);
     const afterHuman = { ...room, game: { ...room.game!, currentPlayerIndex: 1 } };
 
     const next = playCpuTurns(afterHuman, createRng(1), NOW);

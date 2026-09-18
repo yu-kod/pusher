@@ -90,6 +90,17 @@ export type DeckConfig = {
  * → プリセット coin3Ratio25 で以前の構成に戻せる。
  */
 export const DEFAULT_DECK_CONFIG: DeckConfig = {
+  coins: { 1: 40, 2: 35, 3: 13 },
+  events: { avalanche: 5, openLane: 5, extraSlot: 3, lottery: 3 },
+};
+
+/**
+ * v0.2 のデッキ90枚（`docs/spec.md` §1「v0.2 の 90枚から14枚増やした」）。
+ *
+ * 比率は v0.3 と同じで、増やしたぶんはレーンを深くするために使っている。
+ * §9 の段階測定を回し直すときの土台として残してある。
+ */
+export const DECK_CONFIG_V02: DeckConfig = {
   coins: { 1: 35, 2: 30, 3: 11 },
   events: { avalanche: 4, openLane: 4, extraSlot: 3, lottery: 3 },
 };

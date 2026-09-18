@@ -8,7 +8,7 @@
  * 各値には出典（docs/spec.md のどこ由来か）と、§7 の検証項目に該当する場合は
  * 何と比較すべきかを添えてある。
  */
-import { DEFAULT_DECK_CONFIG, type DeckConfig } from "./deck.js";
+import { DECK_CONFIG_V02, DEFAULT_DECK_CONFIG, type DeckConfig } from "./deck.js";
 
 /**
  * 横穴（バースト）の発生条件（docs/spec.md §5）。
@@ -262,15 +262,15 @@ const LANE_COUNT = 3;
 
 export const DEFAULT_BALANCE: Balance = {
   laneCount: LANE_COUNT,
-  initialLaneCards: 5,
+  initialLaneCards: 12,
   initialPendingCards: 9,
   initialHandSize: 5,
   initialHandBonusPerSeat: 1,
   deck: DEFAULT_DECK_CONFIG,
 
-  progressMode: "turn",
-  useResolutionPriority: false,
-  useBallCards: false,
+  progressMode: "tick",
+  useResolutionPriority: true,
+  useBallCards: true,
   ballPoints: 10,
   maxLanesPerRound: 1,
   maxInsertionRoundsPerTurn: null,
@@ -278,7 +278,7 @@ export const DEFAULT_BALANCE: Balance = {
   roundLaneRefillCount: 0,
   handLimit: null,
   maxRounds: 13,
-  rotateStartPlayer: true,
+  rotateStartPlayer: false,
 
   pushCount: (totalCoins) => Math.ceil(totalCoins / 2),
 
@@ -290,24 +290,49 @@ export const DEFAULT_BALANCE: Balance = {
 };
 
 /**
+ * v0.2 の既定値のうち、v0.3 で変わった部分（`docs/spec.md` 冒頭の変更履歴）。
+ *
+ * 既定が v0.3 になったので、§9 の段階測定（手番制から1つずつ足していく）を
+ * 回し直すにはここまで戻す必要がある。**「3つの変更はどれも単独では効かない」
+ * という結論はこの並びでしか確かめられない**ので、土台として残してある（#121）。
+ */
+const V02 = {
+  progressMode: "turn" as const,
+  useResolutionPriority: false,
+  useBallCards: false,
+  rotateStartPlayer: true,
+  initialLaneCards: 5,
+  deck: DECK_CONFIG_V02,
+};
+
+/**
  * docs/spec.md §7 の検証項目に対応するプリセット。
  *
  * シミュレーション（#13）から名前で選んで比較できるようにしてある。
  * それぞれ「§7 が何と比較せよと言っているか」に1対1で対応する。
+ *
+ * つまみ1つだけのプリセット（`noRoundDraw` など）に添えてある実測値は、既定が
+ * v0.2 だったころに測ったもの。いまは v0.3 の既定に重なるので、数値を比べ直す
+ * ときは `v02` と併せて指定する（`--preset v02 --preset noRoundDraw`）。
  */
 export const BALANCE_PRESETS = {
+  /** v0.2 の既定値一式に戻す（手番制・ボール札なし・レーン5枚・デッキ90枚） */
+  v02: V02,
+
   /** §7 次点: レーンを4本に増やす（v0.1 の構成） */
   lanes4: { laneCount: 4 },
 
   /**
    * #53 以前の既定: 3コイン札をコイン札の 25% に戻す。
    *
-   *   1コイン 30 (39.5%) / 2コイン 27 (35.5%) / 3コイン 19 (25.0%)
+   *   1コイン 35 (39.8%) / 2コイン 31 (35.2%) / 3コイン 22 (25.0%)
    *
-   * 既定は 14.5%。3コイン札は目標値が高く押し込み枚数も多い二重の優位があり、
-   * 25% では投入1枚あたりの回収が 1.99 まで膨らむ（§7 次点）。
+   * 既定は 14.8%。3コイン札は目標値が高く押し込み枚数も多い二重の優位があり、
+   * 25% では投入1枚あたりの回収が 1.99 まで膨らむ（§7 次点。v0.2 の90枚で測った値）。
+   * コイン札の総枚数は既定と同じに保つ。比べたいのは構成比だけなので、枚数まで
+   * 変えると原因が2つになる。
    */
-  coin3Ratio25: { deck: { ...DEFAULT_DECK_CONFIG, coins: { 1: 30, 2: 27, 3: 19 } } },
+  coin3Ratio25: { deck: { ...DEFAULT_DECK_CONFIG, coins: { 1: 35, 2: 31, 3: 22 } } },
 
   /** §7: ラウンド終了時のドローを廃止する */
   noRoundDraw: { roundDrawCount: 0 },
@@ -328,7 +353,7 @@ export const BALANCE_PRESETS = {
    * 待ち時間の割合が下がるかわりに、1ティックで最大4枚が投入されるので
    * 滞留が厚くなる方向に動く。初期滞留の調整が要るかを測るためのプリセット。
    */
-  tickMode: { progressMode: "tick" as const },
+  tickMode: { ...V02, progressMode: "tick" as const },
 
   /**
    * §9 段階2: ティック同時進行に先行権を足す。
@@ -337,13 +362,14 @@ export const BALANCE_PRESETS = {
    * （§4-2 — 順番は席で決まるものではなくなる）。
    */
   tickPriority: {
+    ...V02,
     progressMode: "tick" as const,
     useResolutionPriority: true,
     rotateStartPlayer: false,
   },
 
-  /** ボール札だけを足す（進行方式は変えない）。押し出しの側だけを見たいとき用 */
-  ballCards: { useBallCards: true },
+  /** v0.2 にボール札だけを足す（進行方式は変えない）。押し出しの側だけを見たいとき用 */
+  ballCards: { ...V02, useBallCards: true },
 
   /**
    * §9 段階3: 同時進行 ＋ 先行権 ＋ ボール札。**本命案の全体像**（§3）。
@@ -352,6 +378,7 @@ export const BALANCE_PRESETS = {
    * 「取り合う対象」を置き、先行権が「取り合いの勝敗を判断で決める」。
    */
   tickBall: {
+    ...V02,
     progressMode: "tick" as const,
     useResolutionPriority: true,
     rotateStartPlayer: false,
@@ -363,8 +390,9 @@ export const BALANCE_PRESETS = {
    *
    * レーン6枚ではボール札が1ゲーム35回落ちて「大物」にならなかった。深さ13枚にすると
    * 3〜4ラウンドに1回まで落ち着く。そのぶんのカードとしてデッキを14枚足す（90 → 104）。
-   * カードを増やしたくない場合は `initialPendingCards` を 5 へ下げれば 90枚のままでも
-   * 同じ深さにできる（滞留が薄くなるぶん目標値は下がる）。
+   *
+   * **いまは既定値と同じもの**（#121）。ドキュメントと卓上版のキットがこの名前で
+   * 参照しているので、名前は残してある。
    */
   tickBallDeep: {
     progressMode: "tick" as const,
@@ -372,10 +400,20 @@ export const BALANCE_PRESETS = {
     rotateStartPlayer: false,
     useBallCards: true,
     initialLaneCards: 12,
-    deck: {
-      coins: { 1: 40, 2: 35, 3: 13 },
-      events: { avalanche: 5, openLane: 5, extraSlot: 3, lottery: 3 },
-    },
+    deck: DEFAULT_DECK_CONFIG,
+  },
+
+  /**
+   * §9 の案 A′。カードを増やさずにレーンを同じ深さにする。
+   *
+   * デッキは v0.2 の90枚のままで、初期滞留を 9枚から 5枚へ回してレーンの奥へ入れる。
+   * 骨格は採用案 A'' と同じで、変わるのは深さを何で捻出するかだけ。滞留が薄くなる
+   * ぶん §7 の「滞留の厚み」は下がる。卓上版で配るカードを増やしたくない場合の案。
+   */
+  deck90: {
+    initialLaneCards: 12,
+    initialPendingCards: 5,
+    deck: DECK_CONFIG_V02,
   },
 
   /** #68 以前の既定: 全員に同じ枚数を配る（先手の勝率が 0.28 まで上がる） */
@@ -394,8 +432,8 @@ export const BALANCE_PRESETS = {
   /** #67 以前の既定: 初期滞留 5 枚（横穴を常時にすると厚みが 2.4 まで落ちる） */
   initialPending5: { initialPendingCards: 5 },
 
-  /** #54 以前の挙動: スタートプレイヤーを固定する */
-  fixedStartPlayer: { rotateStartPlayer: false },
+  /** #54 以前の挙動: v0.2 の手番制でスタートプレイヤーを固定する */
+  fixedStartPlayer: { ...V02, rotateStartPlayer: false },
 
   /** §7 次点: 手札上限を 7 枚に設ける（§3 の原案） */
   handLimit7: { handLimit: 7 },

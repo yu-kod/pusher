@@ -446,8 +446,8 @@ describe("ラウンドの進行", () => {
       game: { round: number; currentPlayerIndex: number };
     };
     expect(body.game.round).toBe(2);
-    // ラウンドが進むとスタートプレイヤーが交代する（#54）
-    expect(body.game.currentPlayerIndex).toBe(1);
+    // v0.3 ではスタートプレイヤーという役が無くなり、交代もしない（先行権が役を兼ねる）
+    expect(body.game.currentPlayerIndex).toBe(0);
   });
 });
 

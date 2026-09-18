@@ -11,13 +11,32 @@ import {
 describe("DEFAULT_BALANCE", () => {
   it("設計書どおりの既定値になっている（docs/spec.md §1 §2 §3 §5）", () => {
     expect(DEFAULT_BALANCE.laneCount).toBe(3);
-    expect(DEFAULT_BALANCE.initialLaneCards).toBe(5);
+    expect(DEFAULT_BALANCE.initialLaneCards).toBe(12);
     expect(DEFAULT_BALANCE.initialHandSize).toBe(5);
     expect(DEFAULT_BALANCE.maxRounds).toBe(13);
     expect(DEFAULT_BALANCE.jackpotThreshold).toBe(5);
     expect(DEFAULT_BALANCE.roundDrawCount).toBe(3);
     expect(DEFAULT_BALANCE.roundLaneRefillCount).toBe(0);
     expect(DEFAULT_BALANCE.handLimit).toBeNull();
+  });
+
+  it("v0.3 の進行方式が既定になっている（docs/spec.md §3）", () => {
+    expect(DEFAULT_BALANCE.progressMode).toBe("tick");
+    expect(DEFAULT_BALANCE.useResolutionPriority).toBe(true);
+    expect(DEFAULT_BALANCE.useBallCards).toBe(true);
+    // 先行権の列がスタートプレイヤーの役を兼ねるので、席順の移動は無くなった
+    expect(DEFAULT_BALANCE.rotateStartPlayer).toBe(false);
+  });
+
+  it("デッキが104枚、うちイベントカードが16枚ある（docs/spec.md §1）", () => {
+    const deck = createDeck(DEFAULT_BALANCE.deck);
+
+    expect(deck).toHaveLength(104);
+    expect(deck.filter(isEventCard)).toHaveLength(16);
+  });
+
+  it("レーンの奥はボール札を含めて13枚になる（docs/spec.md §1「レーン」）", () => {
+    expect(DEFAULT_BALANCE.initialLaneCards + 1).toBe(13);
   });
 
   it("コイン札の構成比が 46 / 39 / 15 に近い（docs/spec.md §1）", () => {
@@ -33,6 +52,51 @@ describe("DEFAULT_BALANCE", () => {
     const deck = createDeck(DEFAULT_BALANCE.deck);
 
     expect(deck.filter(isEventCard).length / deck.length).toBeCloseTo(0.15, 1);
+  });
+});
+
+describe("v0.2 へ戻すプリセット", () => {
+  it("v02 は v0.2 の既定値一式に戻す", () => {
+    const v02 = withPreset("v02");
+
+    expect(v02.progressMode).toBe("turn");
+    expect(v02.useResolutionPriority).toBe(false);
+    expect(v02.useBallCards).toBe(false);
+    expect(v02.rotateStartPlayer).toBe(true);
+    expect(v02.initialLaneCards).toBe(5);
+    expect(createDeck(v02.deck)).toHaveLength(90);
+  });
+
+  // §9 の段階測定は v0.2 から1つずつ足して測った。既定が v0.3 になっても
+  // その並びを再現できないと「3つはセットでしか効かない」を確かめ直せない
+  it("段階プリセットは v0.2 を土台に1つずつ足す（docs/turn-structure.md §9）", () => {
+    const tick = withPreset("tickMode");
+    expect(tick.progressMode).toBe("tick");
+    expect(tick.useResolutionPriority).toBe(false);
+    expect(tick.useBallCards).toBe(false);
+    expect(tick.initialLaneCards).toBe(5);
+
+    const priority = withPreset("tickPriority");
+    expect(priority.useResolutionPriority).toBe(true);
+    expect(priority.useBallCards).toBe(false);
+    expect(priority.initialLaneCards).toBe(5);
+
+    const ball = withPreset("tickBall");
+    expect(ball.useBallCards).toBe(true);
+    expect(ball.initialLaneCards).toBe(5);
+  });
+
+  it("tickBallDeep は既定値と同じものを指す（採用案 A″）", () => {
+    expect(withPreset("tickBallDeep")).toEqual(DEFAULT_BALANCE);
+  });
+
+  it("deck90 はカードを増やさずに同じ深さにする（案 A′）", () => {
+    const a1 = withPreset("deck90");
+
+    expect(createDeck(a1.deck)).toHaveLength(90);
+    expect(a1.initialLaneCards).toBe(12);
+    expect(a1.initialPendingCards).toBe(5);
+    expect(a1.useBallCards).toBe(true);
   });
 });
 

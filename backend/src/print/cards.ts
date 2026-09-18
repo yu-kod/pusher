@@ -13,17 +13,16 @@ import {
   type DeckConfig,
   type EventKind,
 } from "../game/deck.js";
-import { withPreset } from "../game/balance.js";
+import { DEFAULT_BALANCE } from "../game/balance.js";
 
 /**
  * 卓上版が刷る構成（#106）。
  *
- * 採用案 A''（プリセット `tickBallDeep`、#104）— ティック同時進行・先行権・ボール札に
+ * 採用案 A''（`docs/spec.md` v0.3）— ティック同時進行・先行権・ボール札に
  * **深いレーン**（12枚＋ボール札）を足した形。デッキは104枚になる。
  *
- * 既定値ではなくプリセットを見ているのは、`docs/spec.md` v0.3 のルールがエンジンに
- * 入った一方で、**既定値はまだ v0.2 のまま**だから（spec v0.3 冒頭「実装の状態」）。
- * サーバーが3拍を持って既定が切り替わったら、ここを `DEFAULT_BALANCE` に戻せばよい。
+ * エンジンの既定値がそのまま卓上版の構成である（#121）。以前はまだ既定が v0.2 だったので
+ * プリセット `tickBallDeep` を見ていたが、サーバーが3拍を持った時点で既定を切り替えた。
  *
  * ## カードを増やさない案（A'）に切り替えるとき
  *
@@ -31,13 +30,9 @@ import { withPreset } from "../game/balance.js";
  * ここを次に差し替えて `npm run print` を回せば刷り物はすべて追従する。
  * ルールブックの「中身」「準備」「早見表」の枚数だけは手書きなので直す。
  *
- *     export const TABLETOP_BALANCE: Balance = {
- *       ...withPreset("tickBallDeep"),
- *       initialPendingCards: 5,
- *       deck: DEFAULT_DECK_CONFIG,
- *     };
+ *     export const TABLETOP_BALANCE = withPreset("deck90");
  */
-export const TABLETOP_BALANCE = withPreset("tickBallDeep");
+export const TABLETOP_BALANCE = DEFAULT_BALANCE;
 
 /** 席（プレイヤー）。色は印刷後に見分けるためのもので、ルールには関わらない */
 export const SEATS = [

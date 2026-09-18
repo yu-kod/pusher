@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  DECK_CONFIG_V02,
   DEFAULT_DECK_CONFIG,
   EVENT_KINDS,
   createDeck,
@@ -68,12 +69,12 @@ describe("createDeck", () => {
 describe("DEFAULT_DECK_CONFIG", () => {
   const deck = createDeck(DEFAULT_DECK_CONFIG);
 
-  it("総枚数が 90 枚になる（docs/spec.md §1）", () => {
-    expect(deck).toHaveLength(90);
+  it("総枚数が 104 枚になる（docs/spec.md §1）", () => {
+    expect(deck).toHaveLength(104);
   });
 
   it("イベントカードがデッキ全体の約 15% を占める（docs/spec.md §1）", () => {
-    expect(deck.filter(isEventCard)).toHaveLength(14);
+    expect(deck.filter(isEventCard)).toHaveLength(16);
     expect(deck.filter(isEventCard).length / deck.length).toBeCloseTo(0.15, 1);
   });
 
@@ -87,7 +88,7 @@ describe("DEFAULT_DECK_CONFIG", () => {
 
   it("コインカードの構成比が 46 / 39 / 15 に近い（docs/spec.md §1）", () => {
     const coins = deck.filter(isCoinCard);
-    expect(coins).toHaveLength(76);
+    expect(coins).toHaveLength(88);
 
     // 3コイン札は #53 のシミュレーションで 25% → 15% に下げた
     const ratio = (n: 1 | 2 | 3) => coins.filter((c) => c.coins === n).length / coins.length;
@@ -96,10 +97,24 @@ describe("DEFAULT_DECK_CONFIG", () => {
     expect(ratio(3)).toBeCloseTo(0.15, 1);
   });
 
-  it("場に出る枚数の2倍以上ある（docs/spec.md §1）", () => {
-    // レーン 3×5 + 滞留 3×5 + 手札 4×5 = 50 枚が場に出る。
-    // 落下カードは山札へ戻る閉じた循環なので、その2倍あれば山札は枯れない
-    expect(deck.length).toBeGreaterThanOrEqual(44 * 2);
+  it("セットアップで配りきってもまだ山札が残る（docs/spec.md §1）", () => {
+    // v0.3 で場に出るのは レーン 3×12 + 滞留 3×9 + 手札 (5+6+7+8) = 89 枚
+    // （ボール札はデッキに入らない）。v0.2 の「場に出る枚数の2倍」は、レーンを
+    // 深くしたぶん場に留まるカードが増えたので満たせなくなった。深さの代償として
+    // 受け入れている。落下カードは山札へ戻り、尽きたら捨て札を混ぜ直す（§3）ので、
+    // 必要なのは「配りきれること」であって2倍の余裕ではない
+    const onTable = 3 * 12 + 3 * 9 + (5 + 6 + 7 + 8);
+
+    expect(deck.length).toBeGreaterThan(onTable);
+  });
+});
+
+describe("DECK_CONFIG_V02", () => {
+  it("v0.2 の90枚のまま残してある（§9 の段階測定を回し直すため）", () => {
+    const v02 = createDeck(DECK_CONFIG_V02);
+
+    expect(v02).toHaveLength(90);
+    expect(v02.filter(isEventCard)).toHaveLength(14);
   });
 });
 

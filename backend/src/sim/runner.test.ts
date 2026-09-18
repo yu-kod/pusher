@@ -81,6 +81,19 @@ describe("simulateGame", () => {
     expect(stats.voluntaryStops + stats.forcedStops).toBe(stats.turns);
   });
 
+  it("手番制でも、手札が尽きて1枚も投入できない手番があれば数える", () => {
+    // ドローを止めると手札はいつか尽きる。投入する前に終わる手番も「続けられなかった」
+    const stats = simulateGame(
+      withPreset("v02", "noRoundDraw"),
+      expectedValueStrategy(),
+      createRng(1),
+      PLAYERS
+    );
+
+    expect(stats.forcedStops).toBeGreaterThan(0);
+    expect(stats.voluntaryStops + stats.forcedStops).toBe(stats.turns);
+  });
+
   it("ランダム戦略は自分でやめる判断をする", () => {
     const stats = simulateGame(DEFAULT_BALANCE, randomStrategy(), createRng(4), PLAYERS);
 
@@ -241,7 +254,7 @@ describe("ティック同時進行（docs/turn-structure.md §4-1）", () => {
   it("ティック数を数える。手番制では 0 のまま", () => {
     const simultaneous = simulateGame(tick, expectedValueStrategy(), createRng(2), PLAYERS);
     const sequential = simulateGame(
-      DEFAULT_BALANCE,
+      withPreset("v02"),
       expectedValueStrategy(),
       createRng(2),
       PLAYERS
