@@ -2,9 +2,8 @@ import type { CSSProperties } from "react";
 import type { Card, LaneView } from "@/lib/types";
 import { PlayingCard } from "./PlayingCard";
 import { cardLabel } from "@/lib/cards";
+import { laneName } from "@/lib/rules";
 import { PAYOUT_DRIFT, tossFrom } from "../cardFlight";
-
-const LANE_NAMES = ["左", "中央", "右"];
 
 /** 奥の山として描く最大枚数。実際の枚数は数字で添える */
 const MAX_STOCK_CARDS = 4;
@@ -49,7 +48,7 @@ export function Lane({
   laneCount,
   flight = null,
 }: Props) {
-  const name = LANE_NAMES[index] ?? String(index);
+  const name = laneName(index);
   const toss = tossFrom(index, laneCount);
   const stockCards = Math.min(lane.stockCount, MAX_STOCK_CARDS);
   const pendingHeight = SMALL_CARD_HEIGHT + Math.max(lane.pending.length - 1, 0) * STACK_OFFSET;

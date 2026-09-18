@@ -206,7 +206,10 @@ describe("ブラウザの WebSocket を使う場合", () => {
     vi.stubGlobal("WebSocket", FakeWebSocket);
   });
 
-  afterEach(() => vi.unstubAllGlobals());
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.unstubAllEnvs();
+  });
 
   it("同じホストの /ws へ繋ぎ、hello を送る", () => {
     const handle = openRoomSocket({ code: "ABC234", onRoom: vi.fn(), onConnected: vi.fn() });
@@ -218,6 +221,16 @@ describe("ブラウザの WebSocket を使う場合", () => {
     expect(JSON.parse(ws.sent[0]!)).toMatchObject({ t: "hello", code: "ABC234" });
     handle.close();
     expect(ws.closed).toBe(true);
+  });
+
+  it("繋ぎ先が渡されていればそこへ繋ぐ（本番は API Gateway の WebSocket API）", () => {
+    vi.stubEnv("VITE_WS_URL", "wss://abc123.execute-api.ap-northeast-1.amazonaws.com/prod");
+
+    openRoomSocket({ code: "ABC234", onRoom: vi.fn(), onConnected: vi.fn() }).close();
+
+    expect(FakeWebSocket.last!.url).toBe(
+      "wss://abc123.execute-api.ap-northeast-1.amazonaws.com/prod"
+    );
   });
 
   it("https のページからは wss で繋ぐ", () => {

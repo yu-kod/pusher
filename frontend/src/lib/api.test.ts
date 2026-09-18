@@ -2,10 +2,14 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   ApiError,
   createRoom,
+  declareInsert,
+  declareWithdraw,
   fetchRoom,
   insertCard,
   joinRoom,
   removeCpu,
+  resolveTick,
+  retractDeclaration,
   startGame,
   stopTurn,
 } from "./api";
@@ -157,5 +161,58 @@ describe("stopTurn", () => {
     await stopTurn("ABCDEF", "t1");
 
     expect(fetchMock.mock.calls[0]?.[0]).toBe("/api/rooms/ABCDEF/turns/stop");
+  });
+});
+
+const ROOM = { code: "ABCDEF", phase: "playing", players: [], game: null };
+
+describe("declareInsert", () => {
+  it("レーンと手札の添字を、そのティックの宣言として送る", async () => {
+    const fetchMock = mockFetch(200, ROOM);
+
+    await declareInsert("ABCDEF", "t1", 3, 1, 2, "k-1");
+
+    expect(fetchMock.mock.calls[0]?.[0]).toBe("/api/rooms/ABCDEF/ticks/3/declarations");
+    expect(fetchMock.mock.calls[0]?.[1]).toMatchObject({
+      method: "POST",
+      body: JSON.stringify({ kind: "insert", laneIndex: 1, handIndex: 2, key: "k-1" }),
+      headers: { Authorization: "Bearer t1" },
+    });
+  });
+});
+
+describe("declareWithdraw", () => {
+  it("降りることを宣言する。投入と同じ口へ送る", async () => {
+    const fetchMock = mockFetch(200, ROOM);
+
+    await declareWithdraw("ABCDEF", "t1", 3, "k-2");
+
+    expect(fetchMock.mock.calls[0]?.[0]).toBe("/api/rooms/ABCDEF/ticks/3/declarations");
+    expect(fetchMock.mock.calls[0]?.[1]).toMatchObject({
+      method: "POST",
+      body: JSON.stringify({ kind: "withdraw", key: "k-2" }),
+    });
+  });
+});
+
+describe("resolveTick", () => {
+  it("締め切りを過ぎても誰も動かないとき、進行を促す", async () => {
+    const fetchMock = mockFetch(200, ROOM);
+
+    await resolveTick("ABCDEF", "t1", 3);
+
+    expect(fetchMock.mock.calls[0]?.[0]).toBe("/api/rooms/ABCDEF/ticks/3/resolve");
+    expect(fetchMock.mock.calls[0]?.[1]).toMatchObject({ method: "POST" });
+  });
+});
+
+describe("retractDeclaration", () => {
+  it("締め切りまでは、自分の宣言を取り下げられる", async () => {
+    const fetchMock = mockFetch(200, ROOM);
+
+    await retractDeclaration("ABCDEF", "t1", 3);
+
+    expect(fetchMock.mock.calls[0]?.[0]).toBe("/api/rooms/ABCDEF/ticks/3/declarations");
+    expect(fetchMock.mock.calls[0]?.[1]).toMatchObject({ method: "DELETE" });
   });
 });

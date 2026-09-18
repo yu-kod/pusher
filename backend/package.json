@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "sim": "tsx src/sim/main.ts",
+    "print": "tsx src/print/main.ts",
     "start": "node dist/index.js",
     "test": "vitest run --coverage",
     "test:watch": "vitest",
@@ -12,17 +13,18 @@
     "typecheck": "tsc --noEmit",
     "format": "prettier --write src/",
     "format:check": "prettier --check src/",
-    "build:lambda": "esbuild src/lambda.ts --bundle --platform=node --target=node22 --outdir=dist --external:@aws-sdk/*"
+    "build:lambda": "esbuild src/lambda.ts src/ws.ts --bundle --platform=node --target=node22 --outdir=dist"
   },
   "dependencies": {
+    "@aws-sdk/client-apigatewaymanagementapi": "^3.1135.0",
+    "@aws-sdk/client-dynamodb": "^3.1135.0",
+    "@aws-sdk/lib-dynamodb": "^3.1135.0",
     "@hono/node-server": "^2.0.8",
     "hono": "^4.12.28",
     "ws": "^8.21.3",
     "zod": "^4.6.5"
   },
   "devDependencies": {
-    "@aws-sdk/client-dynamodb": "^3.1135.0",
-    "@aws-sdk/lib-dynamodb": "^3.1135.0",
     "@eslint/js": "^10.0.1",
     "@types/node": "^26.5.1",
     "@types/ws": "^8.18.1",

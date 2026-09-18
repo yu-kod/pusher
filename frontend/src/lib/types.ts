@@ -25,6 +25,45 @@ export type PlayerView = {
   name: string;
   points: number;
   hand: HandView;
+  /**
+   * 宣言を済ませたか（docs/realtime.md §8-3）。
+   *
+   * 宣言の拍で公開されるのはこの真偽値だけで、**中身は入らない**。投入先も、
+   * 降りたことも伏せる。誰が降りたか先に分かると、残った人は「あのボール札は
+   * 自分まで残る」と知って投入先を決められ、遅く決めた人ほど得をする。
+   */
+  declared?: boolean;
+  /**
+   * 宣言の中身。公開の拍に入るまで、他人のぶんは `null` で届く。
+   * 自分のぶんだけは宣言中も入っている（確認と取り消しのため）。
+   */
+  declaration?: DeclarationView | null;
+};
+
+/** 宣言の拍で選べる2つ（docs/turn-structure.md §4）。どちらも「宣言した」として扱う */
+export type DeclarationView =
+  /** 投入する — レーン1つと手札1枚 */
+  | { kind: "insert"; laneIndex: number; handIndex: number; card: Card }
+  /** 降りる — 未確定得点を確定して、そのラウンドから抜ける */
+  | { kind: "withdraw" };
+
+/** 進行の拍（docs/realtime.md §8-1） */
+export type TickPhase = "declaring" | "revealing" | "resolving";
+
+/**
+ * 解決1人ぶん（docs/realtime.md §8-5）。
+ *
+ * サーバーは1回の計算で全員ぶんを出し、列として1つのスナップショットに載せる。
+ * 1人ずつ動いて見えるのは演出の側の話で、配信は1回きり。
+ */
+export type ResolutionStepView = {
+  playerId: string;
+  laneIndex: number;
+  roll: number;
+  pushedCount: number;
+  droppedCount: number;
+  gainedPoints: number;
+  sideHole: boolean;
 };
 
 /** 横穴（バースト）の発生条件（docs/spec.md §5）。判定はサーバーが行う */
@@ -54,6 +93,28 @@ export type GameView = {
   round: number;
   lastSideHolePlayerId: string | null;
   phase: "playing" | "finished";
+
+  /**
+   * ティック同時進行（docs/realtime.md §8）。
+   *
+   * サーバーがまだ3拍を持っていない間は届かない。その場合は手番制として動く。
+   * **拍の情報はひとまとまりで届く。** 拍だけあって締め切りが無い、という状態は
+   * 起こりえないので、型の上でも分けない。
+   */
+  tick?: TickView;
+};
+
+/** いま進行中のティック（docs/realtime.md §8-1） */
+export type TickView = {
+  /** 何ティック目か */
+  index: number;
+  phase: TickPhase;
+  /** 宣言の締め切り（サーバーの epoch ミリ秒）。権威はここで、端末の時計は表示にしか使わない */
+  deadlineAt: number;
+  /** 解決を計算した時刻。再生の開始点をここに揃える（§8-5）。解決前は null */
+  resolvedAt: number | null;
+  /** 先行権順に並んだ解決のステップ列。解決前は空 */
+  steps: ResolutionStepView[];
 };
 
 export type RoomPlayer = { id: string; name: string; isCpu: boolean };
