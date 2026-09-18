@@ -358,6 +358,26 @@ export const BALANCE_PRESETS = {
     useBallCards: true,
   },
 
+  /**
+   * §9 の採用案 A''。本命案の3点セットに、**深いレーン**を足したもの。
+   *
+   * レーン6枚ではボール札が1ゲーム35回落ちて「大物」にならなかった。深さ13枚にすると
+   * 3〜4ラウンドに1回まで落ち着く。そのぶんのカードとしてデッキを14枚足す（90 → 104）。
+   * カードを増やしたくない場合は `initialPendingCards` を 5 へ下げれば 90枚のままでも
+   * 同じ深さにできる（滞留が薄くなるぶん目標値は下がる）。
+   */
+  tickBallDeep: {
+    progressMode: "tick" as const,
+    useResolutionPriority: true,
+    rotateStartPlayer: false,
+    useBallCards: true,
+    initialLaneCards: 12,
+    deck: {
+      coins: { 1: 40, 2: 35, 3: 13 },
+      events: { avalanche: 5, openLane: 5, extraSlot: 3, lottery: 3 },
+    },
+  },
+
   /** #68 以前の既定: 全員に同じ枚数を配る（先手の勝率が 0.28 まで上がる） */
   noHandBonus: { initialHandBonusPerSeat: 0 },
 

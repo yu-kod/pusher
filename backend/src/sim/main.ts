@@ -9,7 +9,7 @@
  *
  * 出力する数値の意味と目標値は docs/spec.md §7 を参照。
  */
-import { DEFAULT_BALANCE, withPreset, type PresetName } from "../game/balance.js";
+import { BALANCE_PRESETS, DEFAULT_BALANCE, withPreset, type PresetName } from "../game/balance.js";
 import { createRng } from "../game/rng.js";
 import { simulateMany, type Summary } from "./runner.js";
 import { expectedValueStrategy, randomStrategy, type Strategy } from "./strategy.js";
@@ -43,6 +43,13 @@ function parseArgs(argv: readonly string[]): Options {
         options.games = Number(value);
         break;
       case "--preset":
+        // 知らない名前を黙って無視すると、既定値の数値を「プリセットの結果」として
+        // 読んでしまう。測り間違いはグラフを見ても気づけないので、ここで止める
+        if (!(value in BALANCE_PRESETS)) {
+          throw new Error(
+            `知らないプリセット: ${value}\n使えるもの: ${Object.keys(BALANCE_PRESETS).join(", ")}`
+          );
+        }
         options.presets.push(value as PresetName);
         break;
       case "--strategy":

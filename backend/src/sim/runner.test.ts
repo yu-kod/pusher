@@ -451,3 +451,36 @@ describe("ボール札（docs/turn-structure.md §4-3 / #100）", () => {
     expect(run()).toEqual(run());
   });
 });
+
+describe("採用案 A''（docs/turn-structure.md §9）", () => {
+  const adopted = withPreset("tickBallDeep");
+
+  it("完走する", () => {
+    expect(simulateGame(adopted, expectedValueStrategy(), createRng(1), PLAYERS).finished).toBe(
+      true
+    );
+  });
+
+  it("3人でも回る", () => {
+    expect(simulateGame(adopted, randomStrategy(), createRng(5), 3).finished).toBe(true);
+  });
+
+  it("ボール札が「大物」になる。現行のレーンの深さより落下が減る", () => {
+    const deep = simulateMany(50, adopted, expectedValueStrategy(), createRng(11), PLAYERS);
+    const shallow = simulateMany(
+      50,
+      withPreset("tickBall"),
+      expectedValueStrategy(),
+      createRng(11),
+      PLAYERS
+    );
+
+    expect(deep.avgBallDrops).toBeLessThan(shallow.avgBallDrops / 2);
+  });
+
+  it("押し引きの判断は生きたまま（目標 0.3 以上）", () => {
+    const summary = simulateMany(50, adopted, expectedValueStrategy(), createRng(11), PLAYERS);
+
+    expect(summary.voluntaryStopRate).toBeGreaterThan(0.3);
+  });
+});
