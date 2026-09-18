@@ -1,20 +1,31 @@
 /**
  * 卓上版（プリント＆プレイ）のカード一式（#91）。
  *
- * 枚数と構成比は `game/deck.ts` の `DEFAULT_DECK_CONFIG` を単一の出典とし、
- * ここでは印刷用の見た目だけを決める。**同じ数字を2か所に書かない。**
+ * 枚数と構成比は `game/balance.ts` の調整値を単一の出典とし、ここでは印刷用の
+ * 見た目だけを決める。**同じ数字を2か所に書かない。**
  *
- * ルールの出典は `docs/spec.md` v0.2 と `docs/turn-structure.md`（本命案）。
+ * ルールの出典は `docs/spec.md` と `docs/turn-structure.md`（本命案）。
  */
 import {
-  DEFAULT_DECK_CONFIG,
   createDeck,
   isCoinCard,
   type CoinCount,
   type DeckConfig,
   type EventKind,
 } from "../game/deck.js";
-import { DEFAULT_BALANCE } from "../game/balance.js";
+import { withPreset } from "../game/balance.js";
+
+/**
+ * 卓上版が刷る構成（#106）。
+ *
+ * 採用案 A''（プリセット `tickBallDeep`、#104）— ティック同時進行・先行権・ボール札に
+ * **深いレーン**（12枚＋ボール札）を足した形。デッキは104枚になる。
+ *
+ * 既定値ではなくプリセットを見ているのは、この3点セットがまだ既定値に入っていないため。
+ * `docs/spec.md` v0.3 で既定値が入れ替わったら、ここを `DEFAULT_BALANCE` に戻せば
+ * 紙の側は何も変えずに追従できる。
+ */
+export const TABLETOP_BALANCE = withPreset("tickBallDeep");
 
 /** 席（プレイヤー）。色は印刷後に見分けるためのもので、ルールには関わらない */
 export const SEATS = [
@@ -32,7 +43,7 @@ export const LANE_NAMES = ["左", "中央", "右"] as const;
  *
  * エンジンの調整値が出典（#100）。印刷物とエンジンで別の数字を持たない。
  */
-export const BALL_CARD_POINTS = DEFAULT_BALANCE.ballPoints;
+export const BALL_CARD_POINTS = TABLETOP_BALANCE.ballPoints;
 
 export type PrintCard =
   | { kind: "coin"; coins: CoinCount }
@@ -66,7 +77,7 @@ export type KitSection = {
 };
 
 /** メインデッキ90枚（コイン札＋イベント札）。順番は構成の確認用で、遊ぶ前にシャッフルする */
-export function buildDeckCards(config: DeckConfig = DEFAULT_DECK_CONFIG): PrintCard[] {
+export function buildDeckCards(config: DeckConfig = TABLETOP_BALANCE.deck): PrintCard[] {
   return createDeck(config).map((card) =>
     isCoinCard(card)
       ? ({ kind: "coin", coins: card.coins } as const)
@@ -97,7 +108,7 @@ export function buildSeatCards(seatCount: number): PrintCard[] {
 }
 
 /** 卓上版一式。印刷する順に並べる */
-export function buildTabletopKit(config: DeckConfig = DEFAULT_DECK_CONFIG): KitSection[] {
+export function buildTabletopKit(config: DeckConfig = TABLETOP_BALANCE.deck): KitSection[] {
   return [
     {
       title: "メインデッキ",
@@ -107,7 +118,7 @@ export function buildTabletopKit(config: DeckConfig = DEFAULT_DECK_CONFIG): KitS
     {
       title: "ボール札",
       description: `各レーンに1枚ずつ、表向きで入れる。落ちると ${BALL_CARD_POINTS}点`,
-      cards: buildBallCards(DEFAULT_BALANCE.laneCount),
+      cards: buildBallCards(TABLETOP_BALANCE.laneCount),
     },
     {
       title: "各プレイヤーのカード",
@@ -143,7 +154,7 @@ export function cardFace(card: PrintCard): CardFace {
       title: `コイン ${"●".repeat(card.coins)}`,
       figure: String(card.coins),
       body: "目標値 ＝ このコイン数 ＋ 滞留の枚数",
-      note: `押し込み ${DEFAULT_BALANCE.pushCount(card.coins)}枚 ／ 落ちると ${card.coins}点`,
+      note: `押し込み ${TABLETOP_BALANCE.pushCount(card.coins)}枚 ／ 落ちると ${card.coins}点`,
       tone: "coin",
     };
   }

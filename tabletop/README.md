@@ -10,7 +10,7 @@
 | ファイル | 枚数 | 中身 |
 |---|---|---|
 | `rulebook.html` | A4 6枚 | 日本語のルールブック（準備・1ラウンドの流れ・勝利条件・早見表） |
-| `cards.html` | A4 14枚 | カード113枚（メインデッキ90＋ボール札3＋各プレイヤー5枚×4人） |
+| `cards.html` | A4 16枚 | カード127枚（メインデッキ104＋ボール札3＋各プレイヤー5枚×4人） |
 | `board.html` | A4 1枚 | 台紙（3本のレーン） |
 | `tracks.html` | A4 1枚 | 得点・ラウンド・JPカウンター・先行権の列・マーカー |
 | `player-mats.html` | A4 2枚 | 個人マット（未確定得点トラックと宣言を伏せる枠）2人分×2 |
@@ -36,8 +36,9 @@ npm run print
 
 数字の出典は1か所にまとめてある。
 
-- 枚数とコインの比率 → `backend/src/game/deck.ts` の `DEFAULT_DECK_CONFIG`
-- ラウンド数・JPの閾値・押し込み枚数 → `backend/src/game/balance.ts` の `DEFAULT_BALANCE`
+- 枚数・コインの比率・レーンの深さ・ラウンド数・JPの閾値・押し込み枚数
+  → `backend/src/game/balance.ts` のプリセット `tickBallDeep`（採用案 A″）。
+  `backend/src/print/cards.ts` の `TABLETOP_BALANCE` がそれを見ている
 
 `board.html` と `rulebook.html` は手書きなので、ルールを変えたときは直接直す。
 
