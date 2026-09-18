@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { createApp } from "../app.js";
-import { createInMemoryRoomStore } from "../room/store.js";
+import { createInMemoryRoomStore, RoomConflictError } from "../room/store.js";
 
 /** ルームを1つ作り、参加者を揃えたアプリとコードを返す */
 async function withRoom(names: readonly string[] = ["A", "B", "C"]) {
@@ -644,5 +644,74 @@ describe("DELETE /api/rooms/:code/players/:id（CPU の削除）", () => {
       { id: "p1", name: "あなた", isCpu: false },
       { id: "p3", name: "CPU2", isCpu: true },
     ]);
+  });
+});
+
+describe("同時更新", () => {
+  it("同時に参加すると、片方だけが通り、もう片方は 409 になる", async () => {
+    const { app, code } = await withRoom(["A"]);
+
+    const [first, second] = await Promise.all([
+      post(app, `/api/rooms/${code}/players`, { name: "B" }),
+      post(app, `/api/rooms/${code}/players`, { name: "C" }),
+    ]);
+
+    const statuses = [first.status, second.status].sort();
+    expect(statuses).toEqual([201, 409]);
+  });
+
+  it("負けたほうの更新で先に入った参加者が消えない", async () => {
+    const { app, code } = await withRoom(["A"]);
+
+    await Promise.all([
+      post(app, `/api/rooms/${code}/players`, { name: "B" }),
+      post(app, `/api/rooms/${code}/players`, { name: "C" }),
+    ]);
+
+    const body = (await (await app.request(`/api/rooms/${code}`)).json()) as {
+      players: { name: string }[];
+    };
+    expect(body.players).toHaveLength(2);
+    expect(body.players[0]?.name).toBe("A");
+  });
+
+  it("409 のレスポンスは統一形式のエラーを返す", async () => {
+    const store = createInMemoryRoomStore();
+    const app = createApp({
+      store: { ...store, update: (room) => Promise.reject(new RoomConflictError(room.code)) },
+      seed: 1,
+    });
+    const created = await post(app, "/api/rooms", { name: "A" });
+    const { code } = (await created.json()) as { code: string };
+
+    const res = await post(app, `/api/rooms/${code}/players`, { name: "B" });
+
+    expect(res.status).toBe(409);
+    await expect(res.json()).resolves.toMatchObject({ error: { code: "ROOM_CONFLICT" } });
+  });
+
+  it("保存先のそれ以外の失敗は 500 のまま（握りつぶさない）", async () => {
+    const store = createInMemoryRoomStore();
+    const app = createApp({
+      store: { ...store, update: () => Promise.reject(new Error("テーブルが無い")) },
+      seed: 1,
+    });
+    const created = await post(app, "/api/rooms", { name: "A" });
+    const { code } = (await created.json()) as { code: string };
+
+    const res = await post(app, `/api/rooms/${code}/players`, { name: "B" });
+
+    expect(res.status).toBe(500);
+  });
+
+  it("ルームコードが衝突したら 409（作成をやり直せる）", async () => {
+    const store = createInMemoryRoomStore();
+    // 同じシードなので2回目の作成は同じコードになる
+    const app = createApp({ store, seed: 1 });
+    await post(app, "/api/rooms", { name: "A" });
+
+    const res = await post(createApp({ store, seed: 1 }), "/api/rooms", { name: "B" });
+
+    expect(res.status).toBe(409);
   });
 });

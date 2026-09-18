@@ -27,3 +27,8 @@ output "lambda_function_name" {
   description = "HTTP API の Lambda 関数名"
   value       = aws_lambda_function.api.function_name
 }
+
+output "app_table_name" {
+  description = "ルームの状態を入れる DynamoDB テーブル名"
+  value       = aws_dynamodb_table.app.name
+}

@@ -29,6 +29,13 @@ export const forbidden = (message: string) => new ApiError(403, "FORBIDDEN", mes
 export const roomNotFound = (code: string) =>
   new ApiError(404, "ROOM_NOT_FOUND", `ルームが見つからない: ${code}`);
 
+/**
+ * 保存先の状態が読んだときから変わっていて書き込めなかった。
+ *
+ * クライアントは状態を取り直してからやり直す。
+ */
+export const roomConflict = (message: string) => new ApiError(409, "ROOM_CONFLICT", message);
+
 /** 形式は正しいが、ゲームのルール上できない操作 */
 export const unprocessable = (message: string) => new ApiError(422, "UNPROCESSABLE", message);
 
