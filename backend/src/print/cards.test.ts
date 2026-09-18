@@ -103,6 +103,13 @@ describe("cardFace", () => {
     expect(cardFace({ kind: "coin", coins: 2 }).note).toContain("押し込み 1枚");
   });
 
+  it("「投入口増設」に追加手番は無い（spec v0.3 §6）", () => {
+    const face = cardFace({ kind: "event", event: "extraSlot" });
+
+    expect(face.body).toContain("2枚同時");
+    expect(face.body).not.toContain("もう1枚投入");
+  });
+
   it("イベントカードは4種すべてに名前と効果がある", () => {
     for (const event of EVENT_KINDS) {
       const face = cardFace({ kind: "event", event });

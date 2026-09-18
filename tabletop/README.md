@@ -40,6 +40,10 @@ npm run print
   → `backend/src/game/balance.ts` のプリセット `tickBallDeep`（採用案 A″）。
   `backend/src/print/cards.ts` の `TABLETOP_BALANCE` がそれを見ている
 
+カードを増やさない案（A′：初期滞留を9枚 → 5枚に下げてデッキ90枚のまま）に切り替える場合も、
+`TABLETOP_BALANCE` の1か所を差し替えて `npm run print` を回すだけでよい（書き方は `cards.ts` のコメント）。
+ルールブックの「中身」「準備」「早見表」の枚数は手書きなので、そこだけ直す。
+
 `board.html` と `rulebook.html` は手書きなので、ルールを変えたときは直接直す。
 
 ## 遊んだあと
