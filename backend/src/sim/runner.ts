@@ -234,7 +234,7 @@ function simulateTickGame(
   };
 
   while (state.phase === "playing") {
-    // ラウンド開始。スタートプレイヤーから順に並べる（先行権は #90 で入れ替える）
+    // ラウンド開始。スタートプレイヤーから順に並べる（先行権は #98 で入れ替える）
     let active = Array.from(
       { length: playerCount },
       (_, i) => (state.startPlayerIndex + i) % playerCount
