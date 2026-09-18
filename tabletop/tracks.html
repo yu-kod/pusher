@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>PUSHER TABLE 卓上版 トラック</title>
+<style>
+  @page { size: A4; margin: 0; }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: "Hiragino Sans", "Noto Sans JP", "Yu Gothic", sans-serif;
+    color: #1b1b1b;
+    background: #efefef;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  .sheet {
+    width: 210mm;
+    height: 297mm;
+    padding: 12mm;
+    margin: 0 auto 6mm;
+    background: #fff;
+  }
+  .sheet-head {
+    display: flex;
+    justify-content: space-between;
+    font-size: 3.4mm;
+    color: #666;
+    margin-bottom: 4mm;
+  }
+  h2 { font-size: 4.4mm; margin: 0 0 1.5mm; }
+  .hint { font-size: 3mm; color: #555; margin: 0 0 2.5mm; line-height: 1.5; }
+  .cell {
+    border: 0.25mm solid #aaa;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 3.2mm;
+    color: #333;
+  }
+  @media print {
+    body { background: #fff; }
+    .sheet { margin: 0; page-break-after: always; }
+    .sheet:last-child { page-break-after: auto; }
+  }
+
+  .score-track { display: grid; grid-template-columns: repeat(10, 18.6mm); margin-bottom: 6mm; }
+  .score-track .cell { height: 10mm; }
+  .score-track .cell:nth-child(10n + 1) { background: #f1f1f1; font-weight: 700; }
+  .row { display: flex; gap: 8mm; margin-bottom: 6mm; }
+  .round-track { display: grid; grid-template-columns: repeat(13, 8.6mm); }
+  .round-track .cell { height: 11mm; }
+  .jp-track { display: grid; grid-template-columns: repeat(6, 10mm); }
+  .jp-track .cell { height: 11mm; }
+  .jp-track .cell:last-child { background: #fdf0d5; font-weight: 700; }
+  .priority { display: grid; grid-template-columns: repeat(4, 44mm); gap: 3mm; }
+  .priority-slot {
+    height: 44mm;
+    border: 0.4mm dashed #888;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    padding: 2mm;
+    font-size: 3.2mm;
+    color: #555;
+  }
+  .priority-slot b { font-size: 5mm; color: #222; }
+  .markers { display: flex; flex-wrap: wrap; gap: 3mm; }
+  .marker {
+    width: 13mm;
+    height: 13mm;
+    border: 0.3mm dashed #999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 2.6mm;
+    color: #fff;
+  }
+</style>
+</head>
+<body><section class="sheet"><div class="sheet-head"><span>トラック</span><span>PUSHER TABLE 卓上版</span></div><h2>得点トラック</h2><p class="hint">各自のマーカーを置いて進める。ジャックポットの点数も黒いマーカーで同じトラックに置く。99点を超えたら一周させ、マーカーをもう1つ脇に置いて「+100点」の印にする。</p><div class="score-track"><div class="cell score">0</div><div class="cell score">1</div><div class="cell score">2</div><div class="cell score">3</div><div class="cell score">4</div><div class="cell score">5</div><div class="cell score">6</div><div class="cell score">7</div><div class="cell score">8</div><div class="cell score">9</div><div class="cell score">10</div><div class="cell score">11</div><div class="cell score">12</div><div class="cell score">13</div><div class="cell score">14</div><div class="cell score">15</div><div class="cell score">16</div><div class="cell score">17</div><div class="cell score">18</div><div class="cell score">19</div><div class="cell score">20</div><div class="cell score">21</div><div class="cell score">22</div><div class="cell score">23</div><div class="cell score">24</div><div class="cell score">25</div><div class="cell score">26</div><div class="cell score">27</div><div class="cell score">28</div><div class="cell score">29</div><div class="cell score">30</div><div class="cell score">31</div><div class="cell score">32</div><div class="cell score">33</div><div class="cell score">34</div><div class="cell score">35</div><div class="cell score">36</div><div class="cell score">37</div><div class="cell score">38</div><div class="cell score">39</div><div class="cell score">40</div><div class="cell score">41</div><div class="cell score">42</div><div class="cell score">43</div><div class="cell score">44</div><div class="cell score">45</div><div class="cell score">46</div><div class="cell score">47</div><div class="cell score">48</div><div class="cell score">49</div><div class="cell score">50</div><div class="cell score">51</div><div class="cell score">52</div><div class="cell score">53</div><div class="cell score">54</div><div class="cell score">55</div><div class="cell score">56</div><div class="cell score">57</div><div class="cell score">58</div><div class="cell score">59</div><div class="cell score">60</div><div class="cell score">61</div><div class="cell score">62</div><div class="cell score">63</div><div class="cell score">64</div><div class="cell score">65</div><div class="cell score">66</div><div class="cell score">67</div><div class="cell score">68</div><div class="cell score">69</div><div class="cell score">70</div><div class="cell score">71</div><div class="cell score">72</div><div class="cell score">73</div><div class="cell score">74</div><div class="cell score">75</div><div class="cell score">76</div><div class="cell score">77</div><div class="cell score">78</div><div class="cell score">79</div><div class="cell score">80</div><div class="cell score">81</div><div class="cell score">82</div><div class="cell score">83</div><div class="cell score">84</div><div class="cell score">85</div><div class="cell score">86</div><div class="cell score">87</div><div class="cell score">88</div><div class="cell score">89</div><div class="cell score">90</div><div class="cell score">91</div><div class="cell score">92</div><div class="cell score">93</div><div class="cell score">94</div><div class="cell score">95</div><div class="cell score">96</div><div class="cell score">97</div><div class="cell score">98</div><div class="cell score">99</div></div><div class="row"><div><h2>ラウンド</h2><p class="hint">13ラウンドでゲーム終了。</p><div class="round-track"><div class="cell round">1</div><div class="cell round">2</div><div class="cell round">3</div><div class="cell round">4</div><div class="cell round">5</div><div class="cell round">6</div><div class="cell round">7</div><div class="cell round">8</div><div class="cell round">9</div><div class="cell round">10</div><div class="cell round">11</div><div class="cell round">12</div><div class="cell round">13</div></div></div><div><h2>JPカウンター</h2><p class="hint">横穴が出るたびに1つ進む。5に達したら JP判定。</p><div class="jp-track"><div class="cell jp">0</div><div class="cell jp">1</div><div class="cell jp">2</div><div class="cell jp">3</div><div class="cell jp">4</div><div class="cell jp">5</div></div></div></div><h2>先行権の列</h2><p class="hint">降りた人から順に、自分のプレイヤーカードを左から置いていく。この並びが次のラウンドの解決順になる。横穴や手札切れで抜けた人は、自分から降りた人より後ろに置く。</p><div class="priority"><div class="priority-slot"><b>1番目</b><span>プレイヤーカードを置く</span></div><div class="priority-slot"><b>2番目</b><span>プレイヤーカードを置く</span></div><div class="priority-slot"><b>3番目</b><span>プレイヤーカードを置く</span></div><div class="priority-slot"><b>4番目</b><span>プレイヤーカードを置く</span></div></div><h2 style="margin-top: 6mm">マーカー（切り取って使う）</h2><p class="hint">各色2つずつ（得点用と未確定得点用）。JP はジャックポットの点数、R はラウンド。</p><div class="markers"><div class="marker" style="background: #c0392b">赤</div><div class="marker" style="background: #c0392b">赤</div><div class="marker" style="background: #2472a4">青</div><div class="marker" style="background: #2472a4">青</div><div class="marker" style="background: #1e8449">緑</div><div class="marker" style="background: #1e8449">緑</div><div class="marker" style="background: #b7950b">黄</div><div class="marker" style="background: #b7950b">黄</div><div class="marker" style="background: #333">JP</div><div class="marker" style="background: #333">JP</div><div class="marker" style="background: #777">R</div><div class="marker" style="background: #777">R</div></div></section></body>
+</html>

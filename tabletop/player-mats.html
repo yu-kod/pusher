@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>PUSHER TABLE 卓上版 個人マット</title>
+<style>
+  @page { size: A4; margin: 0; }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: "Hiragino Sans", "Noto Sans JP", "Yu Gothic", sans-serif;
+    color: #1b1b1b;
+    background: #efefef;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  .sheet {
+    width: 210mm;
+    height: 297mm;
+    padding: 12mm;
+    margin: 0 auto 6mm;
+    background: #fff;
+  }
+  .sheet-head {
+    display: flex;
+    justify-content: space-between;
+    font-size: 3.4mm;
+    color: #666;
+    margin-bottom: 4mm;
+  }
+  h2 { font-size: 4.4mm; margin: 0 0 1.5mm; }
+  .hint { font-size: 3mm; color: #555; margin: 0 0 2.5mm; line-height: 1.5; }
+  .cell {
+    border: 0.25mm solid #aaa;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 3.2mm;
+    color: #333;
+  }
+  @media print {
+    body { background: #fff; }
+    .sheet { margin: 0; page-break-after: always; }
+    .sheet:last-child { page-break-after: auto; }
+  }
+
+  .mat {
+    height: 128mm;
+    border: 0.4mm solid #333;
+    padding: 4mm;
+    margin-bottom: 6mm;
+  }
+  .mat-head { display: flex; align-items: baseline; gap: 3mm; margin-bottom: 2mm; }
+  .mat-head b { font-size: 6mm; }
+  .mat-head span { font-size: 3mm; color: #555; }
+  .pending-track { display: grid; grid-template-columns: repeat(20, 8.8mm); margin-bottom: 3mm; }
+  .pending-track .cell { height: 8mm; font-size: 2.8mm; }
+  .pending-track .cell:nth-child(10n + 1) { background: #f1f1f1; font-weight: 700; }
+  .slots { display: flex; gap: 4mm; }
+  .declare-slot {
+    width: 64mm;
+    height: 84mm;
+    border: 0.4mm dashed #888;
+    padding: 2mm;
+    font-size: 3.1mm;
+    color: #555;
+  }
+  .declare-slot b { display: block; font-size: 3.8mm; color: #222; margin-bottom: 1mm; }
+</style>
+</head>
+<body><section class="sheet"><div class="sheet-head"><span>個人マット</span><span>PUSHER TABLE 卓上版</span></div><div class="mat"><div class="mat-head"><b style="color: #c0392b">赤</b><span>未確定得点は、降りるまで自分の得点にならない。横穴を踏むと全部ジャックポットへ移る。</span></div><div class="pending-track"><div class="cell pending">0</div><div class="cell pending">1</div><div class="cell pending">2</div><div class="cell pending">3</div><div class="cell pending">4</div><div class="cell pending">5</div><div class="cell pending">6</div><div class="cell pending">7</div><div class="cell pending">8</div><div class="cell pending">9</div><div class="cell pending">10</div><div class="cell pending">11</div><div class="cell pending">12</div><div class="cell pending">13</div><div class="cell pending">14</div><div class="cell pending">15</div><div class="cell pending">16</div><div class="cell pending">17</div><div class="cell pending">18</div><div class="cell pending">19</div><div class="cell pending">20</div><div class="cell pending">21</div><div class="cell pending">22</div><div class="cell pending">23</div><div class="cell pending">24</div><div class="cell pending">25</div><div class="cell pending">26</div><div class="cell pending">27</div><div class="cell pending">28</div><div class="cell pending">29</div><div class="cell pending">30</div><div class="cell pending">31</div><div class="cell pending">32</div><div class="cell pending">33</div><div class="cell pending">34</div><div class="cell pending">35</div><div class="cell pending">36</div><div class="cell pending">37</div><div class="cell pending">38</div><div class="cell pending">39</div></div><div class="slots"><div class="declare-slot"><b>宣言：レーン</b>左・中央・右のどれか1枚、または「降りる」を伏せて置く</div><div class="declare-slot"><b>宣言：投入するカード</b>手札から1枚を伏せて置く。全員が伏せ終わったら一斉に開く</div></div></div><div class="mat"><div class="mat-head"><b style="color: #2472a4">青</b><span>未確定得点は、降りるまで自分の得点にならない。横穴を踏むと全部ジャックポットへ移る。</span></div><div class="pending-track"><div class="cell pending">0</div><div class="cell pending">1</div><div class="cell pending">2</div><div class="cell pending">3</div><div class="cell pending">4</div><div class="cell pending">5</div><div class="cell pending">6</div><div class="cell pending">7</div><div class="cell pending">8</div><div class="cell pending">9</div><div class="cell pending">10</div><div class="cell pending">11</div><div class="cell pending">12</div><div class="cell pending">13</div><div class="cell pending">14</div><div class="cell pending">15</div><div class="cell pending">16</div><div class="cell pending">17</div><div class="cell pending">18</div><div class="cell pending">19</div><div class="cell pending">20</div><div class="cell pending">21</div><div class="cell pending">22</div><div class="cell pending">23</div><div class="cell pending">24</div><div class="cell pending">25</div><div class="cell pending">26</div><div class="cell pending">27</div><div class="cell pending">28</div><div class="cell pending">29</div><div class="cell pending">30</div><div class="cell pending">31</div><div class="cell pending">32</div><div class="cell pending">33</div><div class="cell pending">34</div><div class="cell pending">35</div><div class="cell pending">36</div><div class="cell pending">37</div><div class="cell pending">38</div><div class="cell pending">39</div></div><div class="slots"><div class="declare-slot"><b>宣言：レーン</b>左・中央・右のどれか1枚、または「降りる」を伏せて置く</div><div class="declare-slot"><b>宣言：投入するカード</b>手札から1枚を伏せて置く。全員が伏せ終わったら一斉に開く</div></div></div></section><section class="sheet"><div class="sheet-head"><span>個人マット</span><span>PUSHER TABLE 卓上版</span></div><div class="mat"><div class="mat-head"><b style="color: #1e8449">緑</b><span>未確定得点は、降りるまで自分の得点にならない。横穴を踏むと全部ジャックポットへ移る。</span></div><div class="pending-track"><div class="cell pending">0</div><div class="cell pending">1</div><div class="cell pending">2</div><div class="cell pending">3</div><div class="cell pending">4</div><div class="cell pending">5</div><div class="cell pending">6</div><div class="cell pending">7</div><div class="cell pending">8</div><div class="cell pending">9</div><div class="cell pending">10</div><div class="cell pending">11</div><div class="cell pending">12</div><div class="cell pending">13</div><div class="cell pending">14</div><div class="cell pending">15</div><div class="cell pending">16</div><div class="cell pending">17</div><div class="cell pending">18</div><div class="cell pending">19</div><div class="cell pending">20</div><div class="cell pending">21</div><div class="cell pending">22</div><div class="cell pending">23</div><div class="cell pending">24</div><div class="cell pending">25</div><div class="cell pending">26</div><div class="cell pending">27</div><div class="cell pending">28</div><div class="cell pending">29</div><div class="cell pending">30</div><div class="cell pending">31</div><div class="cell pending">32</div><div class="cell pending">33</div><div class="cell pending">34</div><div class="cell pending">35</div><div class="cell pending">36</div><div class="cell pending">37</div><div class="cell pending">38</div><div class="cell pending">39</div></div><div class="slots"><div class="declare-slot"><b>宣言：レーン</b>左・中央・右のどれか1枚、または「降りる」を伏せて置く</div><div class="declare-slot"><b>宣言：投入するカード</b>手札から1枚を伏せて置く。全員が伏せ終わったら一斉に開く</div></div></div><div class="mat"><div class="mat-head"><b style="color: #b7950b">黄</b><span>未確定得点は、降りるまで自分の得点にならない。横穴を踏むと全部ジャックポットへ移る。</span></div><div class="pending-track"><div class="cell pending">0</div><div class="cell pending">1</div><div class="cell pending">2</div><div class="cell pending">3</div><div class="cell pending">4</div><div class="cell pending">5</div><div class="cell pending">6</div><div class="cell pending">7</div><div class="cell pending">8</div><div class="cell pending">9</div><div class="cell pending">10</div><div class="cell pending">11</div><div class="cell pending">12</div><div class="cell pending">13</div><div class="cell pending">14</div><div class="cell pending">15</div><div class="cell pending">16</div><div class="cell pending">17</div><div class="cell pending">18</div><div class="cell pending">19</div><div class="cell pending">20</div><div class="cell pending">21</div><div class="cell pending">22</div><div class="cell pending">23</div><div class="cell pending">24</div><div class="cell pending">25</div><div class="cell pending">26</div><div class="cell pending">27</div><div class="cell pending">28</div><div class="cell pending">29</div><div class="cell pending">30</div><div class="cell pending">31</div><div class="cell pending">32</div><div class="cell pending">33</div><div class="cell pending">34</div><div class="cell pending">35</div><div class="cell pending">36</div><div class="cell pending">37</div><div class="cell pending">38</div><div class="cell pending">39</div></div><div class="slots"><div class="declare-slot"><b>宣言：レーン</b>左・中央・右のどれか1枚、または「降りる」を伏せて置く</div><div class="declare-slot"><b>宣言：投入するカード</b>手札から1枚を伏せて置く。全員が伏せ終わったら一斉に開く</div></div></div></section></body>
+</html>
