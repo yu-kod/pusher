@@ -103,11 +103,13 @@ describe("cardFace", () => {
     }
   });
 
-  it("ボール札は得点を載せる", () => {
+  it("ボール札は得点と、落ちたあとの入れ直しかたを載せる", () => {
     const face = cardFace({ kind: "ball", points: 10 });
 
     expect(face.tone).toBe("ball");
     expect(face.figure).toBe("10");
+    // 入れ直すだけだとレーンが厚くなり続ける（game/ball.ts / #100）
+    expect(face.note).toContain("山札");
   });
 
   it("レーン指定カードは席とレーンの名前を載せる", () => {

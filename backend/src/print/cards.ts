@@ -164,7 +164,7 @@ export function cardFace(card: PrintCard): CardFace {
       title: "ボール",
       figure: String(card.points),
       body: "レーンの中で1枚だけ表向きに置く。落ちると得点になる。",
-      note: "落ちたら、そのレーンの奥のいちばん端へ表向きで戻す",
+      note: "落ちたら奥の端へ表向きで戻し、その1枚下のカードを山札の下へ戻す",
       tone: "ball",
     };
   }
