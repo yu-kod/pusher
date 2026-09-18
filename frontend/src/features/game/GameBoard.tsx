@@ -16,6 +16,7 @@ import { Die } from "./components/Die";
 import { Seat } from "./components/Seat";
 import { TickBanner } from "./components/TickBanner";
 import { RevealPanel } from "./components/RevealPanel";
+import { PriorityRow } from "./components/PriorityRow";
 import { ResolutionPanel } from "./components/ResolutionPanel";
 import { DeclarationActions } from "./components/DeclarationActions";
 import { secondsLeft, stepAt } from "./tick";
@@ -246,6 +247,15 @@ export function GameBoard({ code, game, credentials, reload }: Props) {
               ? null
               : (game.players.find((p) => p.id === playing.playerId)?.name ?? null)
           }
+        />
+      )}
+
+      {game.resolutionOrder !== undefined && (
+        <PriorityRow
+          players={game.players}
+          order={game.resolutionOrder}
+          movingId={movingId}
+          meId={credentials.playerId}
         />
       )}
 

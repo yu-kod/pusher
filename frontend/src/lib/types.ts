@@ -103,6 +103,15 @@ export type GameView = {
   phase: "playing" | "finished";
 
   /**
+   * 解決する順に並んだプレイヤー id（先行権・docs/spec.md v0.3）。
+   *
+   * 卓上ではプレイヤーカードの列がこれにあたる公開情報。順番を決めるのは
+   * サーバー（`backend/src/game/priority.ts`）で、画面は並べるだけ。
+   * サーバーがまだ解決順を持っていない間は届かない。
+   */
+  resolutionOrder?: string[];
+
+  /**
    * ティック同時進行（docs/realtime.md §8）。
    *
    * サーバーがまだ3拍を持っていない間は届かない。その場合は手番制として動く。

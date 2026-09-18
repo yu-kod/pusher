@@ -905,6 +905,44 @@ describe("3拍の進行", () => {
     expect(screen.getByLabelText("はるとの席")).toHaveAttribute("data-current", "false");
   });
 
+  it("先行権の列を、解決する順に出す", () => {
+    atNow(tickGame({ resolutionOrder: ["p2", "p3", "p1"] }));
+
+    const row = within(screen.getByLabelText("先行権の順"));
+    expect(row.getAllByTestId("priority-seat").map((n) => n.textContent)).toEqual([
+      "1はると",
+      "2そら",
+      "3あき",
+    ]);
+  });
+
+  it("宣言の拍でも先行権の列は見えている", () => {
+    atNow(tickGame({ resolutionOrder: ["p2", "p3", "p1"] }));
+
+    // いつ降りれば次に何番目になるかが読めないと、降りる判断ができない
+    expect(screen.getByTestId("tick-banner")).toHaveAttribute("data-phase", "declaring");
+    expect(screen.getByLabelText("先行権の順")).toBeInTheDocument();
+  });
+
+  it("解決の拍では、列の中でいま動いている人が分かる", () => {
+    atNow(
+      tickGame({
+        resolutionOrder: ["p2", "p3", "p1"],
+        tick: { ...TICK, phase: "resolving", resolvedAt: NOW, steps: STEPS },
+      })
+    );
+
+    const seats = within(screen.getByLabelText("先行権の順")).getAllByTestId("priority-seat");
+    expect(seats[0]).toHaveAttribute("data-moving", "true");
+    expect(seats[1]).toHaveAttribute("data-moving", "false");
+  });
+
+  it("解決順が届いていなければ、先行権の列は出さない", () => {
+    atNow(tickGame());
+
+    expect(screen.queryByLabelText("先行権の順")).not.toBeInTheDocument();
+  });
+
   it("サーバーが3拍を持っていなければ、今までどおり手番制で動く", () => {
     setup(buildGame());
 
