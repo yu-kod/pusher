@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { DEFAULT_BALANCE } from "../game/balance.js";
 import { createRng } from "../game/rng.js";
 import { createRoom, generateRoomCode, joinRoom, startGame, type Room } from "./room.js";
+import { DECLARATION_WINDOW } from "./tick-session.js";
 
 const NOW = 1_700_000_000_000;
 
@@ -150,5 +151,22 @@ describe("startGame", () => {
 
     expect(room.phase).toBe("lobby");
     expect(room.game).toBeNull();
+  });
+});
+
+describe("startGame — 3拍のティック", () => {
+  const started = () =>
+    startGame(lobbyWith(["A", "B", "C"]), createRng(1), DEFAULT_BALANCE, NOW + 10);
+
+  it("最初のティックを宣言の拍で開く（docs/spec.md §3）", () => {
+    expect(started().tick?.phase).toBe("declaring");
+  });
+
+  it("締め切りは開始時刻から測る", () => {
+    expect(started().tick?.deadlineAt).toBe(NOW + 10 + DECLARATION_WINDOW);
+  });
+
+  it("ロビーのあいだはティックを持たない", () => {
+    expect(createRoom("ABCDEF", NOW).tick).toBeNull();
   });
 });
