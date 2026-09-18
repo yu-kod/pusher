@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { useRoom } from "./useRoom";
 import type { RoomView } from "@/lib/types";
 
-const room: RoomView = { code: "ABCDEF", phase: "lobby", players: [], game: null };
+const room: RoomView = { code: "ABCDEF", rev: 1, phase: "lobby", players: [], game: null };
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -100,5 +100,103 @@ describe("useRoom", () => {
     result.current.setError("だめ");
 
     await waitFor(() => expect(result.current.error).toBe("だめ"));
+  });
+});
+
+describe("useRoom — WebSocket での同期（#15）", () => {
+  /** jsdom には繋ぎ先がないので、グローバルの WebSocket を差し替える */
+  class FakeWebSocket {
+    static last: FakeWebSocket | null = null;
+    onopen: (() => void) | null = null;
+    onmessage: ((event: { data: unknown }) => void) | null = null;
+    onclose: (() => void) | null = null;
+
+    constructor(readonly url: string) {
+      FakeWebSocket.last = this;
+    }
+
+    send() {}
+    close() {}
+  }
+
+  function stubAll(initial: RoomView = room) {
+    FakeWebSocket.last = null;
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue({ ok: true, status: 200, json: () => Promise.resolve(initial) });
+    vi.stubGlobal("fetch", fetchMock);
+    vi.stubGlobal("WebSocket", FakeWebSocket);
+    return fetchMock;
+  }
+
+  /** サーバーからの push を1つ流す */
+  function push(next: RoomView) {
+    FakeWebSocket.last?.onmessage?.({ data: JSON.stringify({ t: "room", room: next }) });
+  }
+
+  it("push で届いた更新をポーリングを待たずに反映する", async () => {
+    stubAll();
+    const { result } = renderHook(() => useRoom("ABCDEF", "t1"));
+    await waitFor(() => expect(result.current.room).toEqual(room));
+
+    const updated = { ...room, rev: 2, players: [{ id: "p1", name: "あき", isCpu: false }] };
+    push(updated);
+
+    await waitFor(() => expect(result.current.room).toEqual(updated));
+  });
+
+  it("手元より古いスナップショットは捨てる", async () => {
+    stubAll({ ...room, rev: 5 });
+    const { result } = renderHook(() => useRoom("ABCDEF", "t1"));
+    await waitFor(() => expect(result.current.room?.rev).toBe(5));
+
+    push({ ...room, rev: 4, phase: "playing" });
+
+    await waitFor(() => expect(result.current.room?.phase).toBe("lobby"));
+  });
+
+  it("同じ rev の取り直しは受け入れる（同一ミリ秒の更新を落とさない）", async () => {
+    stubAll();
+    const { result } = renderHook(() => useRoom("ABCDEF", "t1"));
+    await waitFor(() => expect(result.current.room).toEqual(room));
+
+    push({ ...room, rev: 1, phase: "playing" });
+
+    await waitFor(() => expect(result.current.room?.phase).toBe("playing"));
+  });
+
+  it("繋がっている間はポーリングの間隔を空ける", async () => {
+    const fetchMock = stubAll();
+    renderHook(() => useRoom("ABCDEF", "t1"));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+
+    FakeWebSocket.last?.onopen?.();
+
+    // 繋がっていなければ 2 秒で取り直すが、繋がっている間は取り直さない
+    await new Promise((resolve) => setTimeout(resolve, 2500));
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("切れたらポーリングだけで進行を追える", async () => {
+    const fetchMock = stubAll();
+    renderHook(() => useRoom("ABCDEF", "t1"));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+    FakeWebSocket.last?.onopen?.();
+
+    FakeWebSocket.last?.onclose?.();
+
+    await waitFor(() => expect(fetchMock.mock.calls.length).toBeGreaterThan(1), { timeout: 3000 });
+  });
+
+  it("画面を離れたら接続も閉じる", async () => {
+    stubAll();
+    const close = vi.fn();
+    const { unmount } = renderHook(() => useRoom("ABCDEF", "t1"));
+    await waitFor(() => expect(FakeWebSocket.last).not.toBeNull());
+    FakeWebSocket.last!.close = close;
+
+    unmount();
+
+    expect(close).toHaveBeenCalled();
   });
 });

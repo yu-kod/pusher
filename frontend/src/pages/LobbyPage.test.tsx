@@ -11,7 +11,7 @@ import { buildGame } from "@/test-utils/game";
 const CODE = "ABCDEF";
 
 function lobby(players: RoomView["players"]): RoomView {
-  return { code: CODE, phase: "lobby", players, game: null };
+  return { code: CODE, rev: 1, phase: "lobby", players, game: null };
 }
 
 const あき = { id: "p1", name: "あき", isCpu: false };

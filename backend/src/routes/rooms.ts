@@ -25,7 +25,7 @@ import { endRound, endTurn } from "../game/progress.js";
 import { createRng, type Rng } from "../game/rng.js";
 import { resolveInsertionRound, type InsertionRoundResult } from "../game/round.js";
 import type { GameState } from "../game/setup.js";
-import { viewFor, type GameView } from "../game/view.js";
+import { roomBody } from "../room/body.js";
 import { playCpuTurns } from "../room/cpu.js";
 import {
   createRoom,
@@ -52,6 +52,15 @@ export type RoomsDeps = {
   seed?: number;
   config?: Balance;
   now?: () => number;
+  /**
+   * 状態が変わったことを繋いでいる全員へ知らせる（docs/realtime.md §6 / #15）。
+   *
+   * マスクしていない `Room` をそのまま渡す。誰向けにどこまで見せるかは接続ごとに
+   * 違うので、削るのは配信側（`realtime/hub.ts`）の責務。
+   *
+   * 省略すると配信しない。その場合でもクライアントはポーリングで追える。
+   */
+  publish?: (room: Room) => Promise<void>;
 };
 
 const nameSchema = z.object({
@@ -63,23 +72,6 @@ const insertSchema = z.object({
   laneIndex: z.number().int(),
   handIndexes: z.array(z.number().int()).min(1),
 });
-
-/** ルームの公開情報。トークンは含めない */
-type RoomBody = {
-  code: string;
-  phase: Room["phase"];
-  players: { id: string; name: string; isCpu: boolean }[];
-  game: GameView | null;
-};
-
-function roomBody(room: Room, viewerId: string): RoomBody {
-  return {
-    code: room.code,
-    phase: room.phase,
-    players: room.players.map((p) => ({ id: p.id, name: p.name, isCpu: p.isCpu })),
-    game: room.game === null ? null : viewFor(room.game, viewerId),
-  };
-}
 
 /** Authorization: Bearer <token> から取り出す */
 function tokenOf(header: string | undefined): string | null {
@@ -148,21 +140,26 @@ export function createRoomsRoute(deps: RoomsDeps) {
   };
 
   /**
-   * 読んだときの版のままなら書き込む。
+   * 保存して、繋いでいる全員へ知らせる。
    *
-   * 先に別の更新が入っていたら 409 を返し、クライアントに取り直させる。
-   * 手番制のいまは同時に届くのがロビーの参加くらいなので、サーバー側では
-   * やり直さない（同時投入を入れる #80 で読み直して解決し直す形にする）。
+   * 書き込みは読んだときの版を条件にする（#78）。先に別の更新が入っていたら 409 を返し、
+   * クライアントに状態を取り直させる。手番制のいま同時に届くのはロビーへの参加くらいなので、
+   * サーバー側ではやり直さない（同時投入を入れる #80 で読み直して解決し直す形にする）。
+   *
+   * 配信に失敗してもアクションは成功のまま返す。取りこぼしはポーリングが拾うので、
+   * 通知が届かなかったことを理由に手番を巻き戻すほうがはるかに悪い。
+   * 書き込めなかったときは配信しない（配る新しい状態が無い）。
    */
-  const persist = async (action: Promise<void>): Promise<void> => {
+  const persist = async (room: Room, write: Promise<void>): Promise<void> => {
     try {
-      await action;
+      await write;
     } catch (error) {
       if (error instanceof RoomConflictError) {
         throw roomConflict(error.message);
       }
       throw error;
     }
+    await deps.publish?.(room).catch(() => undefined);
   };
 
   /** 提示されたトークンがこのルームのものか確かめ、プレイヤーを返す */
@@ -193,7 +190,7 @@ export function createRoomsRoute(deps: RoomsDeps) {
     const code = generateRoomCode(rngFor());
     const token = crypto.randomUUID();
     const room = joinRoom(createRoom(code, now()), { name, token, isCpu: isCpu ?? false }, now());
-    await persist(deps.store.create(room));
+    await persist(room, deps.store.create(room));
 
     return c.json({ code, playerId: "p1", token }, 201);
   });
@@ -208,7 +205,7 @@ export function createRoomsRoute(deps: RoomsDeps) {
     const joined = asUnprocessable(() =>
       joinRoom(room, { name, token, isCpu: isCpu ?? false }, now())
     );
-    await persist(deps.store.update(joined, rev));
+    await persist(joined, deps.store.update(joined, rev));
 
     const player = joined.players[joined.players.length - 1];
     return c.json({ playerId: player?.id, token }, 201);
@@ -220,7 +217,7 @@ export function createRoomsRoute(deps: RoomsDeps) {
     const player = authenticate(room, c.req.header("Authorization"));
 
     const removed = asUnprocessable(() => removeCpu(room, c.req.param("id"), now()));
-    await persist(deps.store.update(removed, rev));
+    await persist(removed, deps.store.update(removed, rev));
 
     return c.json(roomBody(removed, player.id));
   });
@@ -233,7 +230,7 @@ export function createRoomsRoute(deps: RoomsDeps) {
     const started = asUnprocessable(() => startGame(room, rngFor(), config, now()));
     // 先頭が CPU なら、人間の手番になるまで自動で進める（#16）
     const advanced = playCpuTurns(started, rngFor(), now());
-    await persist(deps.store.update(advanced, rev));
+    await persist(advanced, deps.store.update(advanced, rev));
 
     return c.json(roomBody(advanced, player.id));
   });
@@ -282,7 +279,7 @@ export function createRoomsRoute(deps: RoomsDeps) {
 
     const next = result.canContinue ? result.state : finishTurn(result.state, rng);
     const saved = playCpuTurns({ ...room, game: next, updatedAt: now() }, rngFor(), now());
-    await persist(deps.store.update(saved, rev));
+    await persist(saved, deps.store.update(saved, rev));
 
     return c.json({ ...roomBody(saved, player.id), result: insertResultBody(result) });
   });
@@ -300,7 +297,7 @@ export function createRoomsRoute(deps: RoomsDeps) {
 
     const ended: Room = { ...room, game: finishTurn(game, rngFor()), updatedAt: now() };
     const saved = playCpuTurns(ended, rngFor(), now());
-    await persist(deps.store.update(saved, rev));
+    await persist(saved, deps.store.update(saved, rev));
 
     return c.json(roomBody(saved, player.id));
   });
