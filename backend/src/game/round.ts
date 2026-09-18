@@ -14,7 +14,7 @@
  */
 import type { Card } from "./deck.js";
 import { applySideHole, canRollJackpot, rollJackpot } from "./jackpot.js";
-import { resolvePush } from "./push.js";
+import { pendingPointsOf, resolvePush } from "./push.js";
 import { collectAndResolveFall, type EventChooser, type ResolvedEvent } from "./resolve.js";
 import type { Rng } from "./rng.js";
 import type { GameState } from "./setup.js";
@@ -132,7 +132,7 @@ export function resolveInsertionRound(
     return { laneIndex, insertedCoins, target, roll, outcome, fallenCards: pushed.fallenCards };
   });
 
-  const gainedPoints = current.pendingPoints - state.pendingPoints;
+  const gainedPoints = pendingPointsOf(current) - pendingPointsOf(state);
   current = { ...current, insertionRoundsThisTurn: current.insertionRoundsThisTurn + 1 };
 
   const busted = lanes.some((lane) => lane.outcome === "sideHole");

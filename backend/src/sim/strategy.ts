@@ -14,6 +14,7 @@
 import type { SideHoleRule } from "../game/balance.js";
 import { autoEventChooser } from "../game/chooser.js";
 import { isCoinCard, type CoinCard } from "../game/deck.js";
+import { pendingPointsOf } from "../game/push.js";
 import type { EventChooser } from "../game/resolve.js";
 import type { Rng } from "../game/rng.js";
 import type { GameState, Lane } from "../game/setup.js";
@@ -165,7 +166,7 @@ export function expectedValueStrategy(): Strategy {
       const bust = bustProbability(next.filter((c) => c.risky).length, state.config.sideHole);
 
       // 押し続ける条件（§3）。未確定得点が 0 なら右辺が 1 になり必ず通る
-      if (bust >= gain / (gain + state.pendingPoints)) {
+      if (bust >= gain / (gain + pendingPointsOf(state))) {
         continue;
       }
       chosen.push(option);

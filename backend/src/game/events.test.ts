@@ -5,25 +5,30 @@ import { createRng } from "./rng.js";
 import { DEFAULT_BALANCE } from "./balance.js";
 import { setupGame, type GameState, type Lane } from "./setup.js";
 import { resolveAvalanche, resolveExtraSlot, resolveLottery, resolveOpenLane } from "./events.js";
+import { splitOverrides, withPendingPoints, type StateOverrides } from "../test-utils/state.js";
+import { pendingPointsOf } from "./push.js";
 
-function buildState(lanes: Partial<Lane>[], overrides?: Partial<GameState>): GameState {
+function buildState(lanes: Partial<Lane>[], overrides?: StateOverrides): GameState {
+  const { pendingPoints, rest } = splitOverrides(overrides);
   const base = setupGame(["A", "B", "C"], createRng(1), DEFAULT_BALANCE);
-  return {
-    ...base,
-    players: base.players.map((p) => ({ ...p, hand: [], points: 0 })),
-    lanes: base.lanes.map((lane, i) => ({
-      ...lane,
-      stock: [],
-      pending: [],
-      hasExtraSlot: false,
-      ...lanes[i],
-    })),
-    drawPile: [],
-    jackpotPoints: 0,
-    pendingPoints: 0,
-    jackpotCounter: 0,
-    ...overrides,
-  };
+  return withPendingPoints(
+    {
+      ...base,
+      players: base.players.map((p) => ({ ...p, hand: [], points: 0 })),
+      lanes: base.lanes.map((lane, i) => ({
+        ...lane,
+        stock: [],
+        pending: [],
+        hasExtraSlot: false,
+        ...lanes[i],
+      })),
+      drawPile: [],
+      jackpotPoints: 0,
+      jackpotCounter: 0,
+      ...rest,
+    },
+    pendingPoints
+  );
 }
 
 describe("resolveAvalanche（なだれ）", () => {
@@ -127,7 +132,7 @@ describe("resolveOpenLane（横穴開放）", () => {
     const result = resolveOpenLane(state, 0, 1);
 
     expect(result.takenCard).toEqual(coin(2));
-    expect(result.state.pendingPoints).toBe(2);
+    expect(pendingPointsOf(result.state)).toBe(2);
     expect(result.state.drawPile).toEqual([coin(2)]);
   });
 
@@ -151,7 +156,7 @@ describe("resolveOpenLane（横穴開放）", () => {
     const result = resolveOpenLane(state, 0, 0);
 
     expect(result.takenCard).toBeNull();
-    expect(result.state.pendingPoints).toBe(0);
+    expect(pendingPointsOf(result.state)).toBe(0);
   });
 
   it("他のレーンは表向きにならない", () => {

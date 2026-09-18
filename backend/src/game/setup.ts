@@ -20,6 +20,17 @@ export type Player = {
   hand: Card[];
   /** 確定した得点。手番を終えるたびに未確定得点がここへ加算される（§3） */
   points: number;
+  /**
+   * まだ確定していない得点（docs/spec.md §3）。
+   *
+   * 「やめる」で `points` へ加算され、横穴（バースト）でジャックポットへ移る。
+   * 手番の開始時は 0。
+   *
+   * **プレイヤーごとに持つ。** 手番制では手番中の1人しか 0 以外にならないが、
+   * ティック同時進行（`docs/turn-structure.md`）では同じラウンドの中で複数人が
+   * 同時に未確定得点を抱える。チキンレースは各自が自分の器で行う（§4-6）。
+   */
+  pendingPoints: number;
 };
 
 /**
@@ -52,13 +63,6 @@ export type GameState = {
   drawPile: Card[];
   /** 捨て札。解決済みのイベントカードが入る。山札へは戻らない（§6） */
   discardPile: Card[];
-  /**
-   * 手番中に積み上がる未確定得点（§3）。
-   *
-   * 「やめる」で手番プレイヤーの points へ加算され、横穴（バースト）で
-   * ジャックポットへ移る。手番の開始時は 0。
-   */
-  pendingPoints: number;
   /**
    * この手番でこれまでに行った投入ラウンドの回数（§3）。
    *
@@ -162,6 +166,7 @@ export function setupGame(playerNames: readonly string[], rng: Rng, config: Bala
     name,
     hand: takeCoins(handSizeOf(index)),
     points: 0,
+    pendingPoints: 0,
   }));
 
   return {
@@ -171,7 +176,6 @@ export function setupGame(playerNames: readonly string[], rng: Rng, config: Bala
     // 引き直したイベントカードは山札の先頭へ戻す
     drawPile: [...skipped, ...deck.slice(next)],
     discardPile: [],
-    pendingPoints: 0,
     insertionRoundsThisTurn: 0,
     jackpotPoints: 0,
     jackpotCounter: 0,

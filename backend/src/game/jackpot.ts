@@ -29,8 +29,10 @@ export function applySideHole(state: GameState): GameState {
   return {
     ...state,
     // この手番の未確定得点がすべてジャックポットへ移る（バースト）
-    jackpotPoints: state.jackpotPoints + state.pendingPoints,
-    pendingPoints: 0,
+    jackpotPoints: state.jackpotPoints + player.pendingPoints,
+    players: state.players.map((p, index) =>
+      index === state.currentPlayerIndex ? { ...p, pendingPoints: 0 } : p
+    ),
     jackpotCounter: Math.min(state.jackpotCounter + 1, state.config.jackpotThreshold),
     lastSideHolePlayerId: player.id,
   };

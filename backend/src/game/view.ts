@@ -18,6 +18,7 @@
 import type { Balance, SideHoleRule } from "./balance.js";
 import type { Card } from "./deck.js";
 import type { GamePhase, GameState, PlayerId } from "./setup.js";
+import { pendingPointsOf } from "./push.js";
 
 /**
  * 滞留エリアのカード1枚。
@@ -42,6 +43,13 @@ export type PlayerView = {
   id: PlayerId;
   name: string;
   points: number;
+  /**
+   * まだ確定していない得点（§3）。
+   *
+   * 未確定得点トラックは卓上に出ている公開情報なので（docs/spec.md §1）、
+   * 全員ぶん返してよい。裏向き情報ではない。
+   */
+  pendingPoints: number;
   hand: HandView;
 };
 
@@ -75,6 +83,12 @@ export type GameView = {
   drawPileCount: number;
   /** 捨て札も枚数のみ。残りのイベント枚数を数えられないようにする */
   discardPileCount: number;
+  /**
+   * 手番プレイヤーの未確定得点（§3）。
+   *
+   * プレイヤーごとの値は `players[].pendingPoints` にある。同時進行（#88）では
+   * 手番プレイヤーという概念が薄れるので、そちらを使うほうが確実。
+   */
   pendingPoints: number;
   jackpotPoints: number;
   jackpotCounter: number;
@@ -118,6 +132,7 @@ export function viewFor(state: GameState, viewerId: PlayerId): GameView {
       id: player.id,
       name: player.name,
       points: player.points,
+      pendingPoints: player.pendingPoints,
       hand:
         player.id === viewerId
           ? { owner: true, cards: player.hand }
@@ -126,7 +141,7 @@ export function viewFor(state: GameState, viewerId: PlayerId): GameView {
 
     drawPileCount: state.drawPile.length,
     discardPileCount: state.discardPile.length,
-    pendingPoints: state.pendingPoints,
+    pendingPoints: pendingPointsOf(state),
     jackpotPoints: state.jackpotPoints,
     jackpotCounter: state.jackpotCounter,
     currentPlayerIndex: state.currentPlayerIndex,

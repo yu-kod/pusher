@@ -6,7 +6,7 @@
  */
 import type { Balance } from "../game/balance.js";
 import { endRound, endTurn, determineWinners } from "../game/progress.js";
-import { bankPendingPoints } from "../game/push.js";
+import { bankPendingPoints, pendingPointsOf } from "../game/push.js";
 import type { Rng } from "../game/rng.js";
 import { resolveInsertionRound } from "../game/round.js";
 import { setupGame, type GameState } from "../game/setup.js";
@@ -124,7 +124,7 @@ export function simulateGame(
         }
         if (!strategy.shouldContinue(state, rng)) {
           stats.voluntaryStops++;
-          stopPoints.push(state.pendingPoints);
+          stopPoints.push(pendingPointsOf(state));
           break;
         }
       }

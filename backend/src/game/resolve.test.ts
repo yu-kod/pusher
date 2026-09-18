@@ -6,6 +6,8 @@ import type { Card, EventKind } from "./deck.js";
 import { createRng } from "./rng.js";
 import { setupGame, type GameState, type Lane } from "./setup.js";
 import { collectAndResolveFall, type EventChooser } from "./resolve.js";
+import { splitOverrides, withPendingPoints, type StateOverrides } from "../test-utils/state.js";
+import { pendingPointsOf } from "./push.js";
 
 const event = (kind: EventKind): Card => ({ kind: "event", event: kind });
 
@@ -17,25 +19,28 @@ function fixedChooser(laneIndex = 0, pendingIndex = 0): EventChooser {
   };
 }
 
-function buildState(lanes: readonly Partial<Lane>[], overrides?: Partial<GameState>): GameState {
+function buildState(lanes: readonly Partial<Lane>[], overrides?: StateOverrides): GameState {
+  const { pendingPoints, rest } = splitOverrides(overrides);
   const base = setupGame(["A", "B", "C"], createRng(1), DEFAULT_BALANCE);
-  return {
-    ...base,
-    players: base.players.map((p) => ({ ...p, hand: [], points: 0 })),
-    lanes: base.lanes.map((lane, i) => ({
-      ...lane,
-      stock: [],
-      pending: [],
-      hasExtraSlot: false,
-      ...lanes[i],
-    })),
-    drawPile: [],
-    discardPile: [],
-    pendingPoints: 0,
-    jackpotPoints: 0,
-    jackpotCounter: 0,
-    ...overrides,
-  };
+  return withPendingPoints(
+    {
+      ...base,
+      players: base.players.map((p) => ({ ...p, hand: [], points: 0 })),
+      lanes: base.lanes.map((lane, i) => ({
+        ...lane,
+        stock: [],
+        pending: [],
+        hasExtraSlot: false,
+        ...lanes[i],
+      })),
+      drawPile: [],
+      discardPile: [],
+      jackpotPoints: 0,
+      jackpotCounter: 0,
+      ...rest,
+    },
+    pendingPoints
+  );
 }
 
 describe("collectAndResolveFall（落下カードの解決・docs/spec.md §6）", () => {
@@ -50,7 +55,7 @@ describe("collectAndResolveFall（落下カードの解決・docs/spec.md §6）
       scriptedRng([])
     );
 
-    expect(result.state.pendingPoints).toBe(5);
+    expect(pendingPointsOf(result.state)).toBe(5);
     expect(result.state.drawPile).toEqual([coin(2), coin(3)]);
     expect(result.events).toEqual([]);
   });
@@ -122,7 +127,7 @@ describe("collectAndResolveFall（落下カードの解決・docs/spec.md §6）
       scriptedRng([])
     );
 
-    expect(result.state.pendingPoints).toBe(3);
+    expect(pendingPointsOf(result.state)).toBe(3);
     expect(result.state.lanes[0]?.stock).toEqual([coin(1)]);
   });
 
@@ -137,7 +142,7 @@ describe("collectAndResolveFall（落下カードの解決・docs/spec.md §6）
       scriptedRng([])
     );
 
-    expect(result.state.pendingPoints).toBe(5);
+    expect(pendingPointsOf(result.state)).toBe(5);
   });
 
   it("もう1枚もイベントなら連鎖する（ルール解釈メモ）", () => {
@@ -153,7 +158,7 @@ describe("collectAndResolveFall（落下カードの解決・docs/spec.md §6）
 
     // 1枚目 → もう1枚（イベント）→ さらにもう1枚（コイン2）
     expect(result.events.map((e) => e.event)).toEqual(["extraSlot", "extraSlot"]);
-    expect(result.state.pendingPoints).toBe(2);
+    expect(pendingPointsOf(result.state)).toBe(2);
     expect(result.state.lanes[0]?.stock).toEqual([]);
   });
 
@@ -168,7 +173,7 @@ describe("collectAndResolveFall（落下カードの解決・docs/spec.md §6）
       scriptedRng([])
     );
 
-    expect(result.state.pendingPoints).toBe(0);
+    expect(pendingPointsOf(result.state)).toBe(0);
     expect(result.events).toHaveLength(1);
   });
 
@@ -177,7 +182,7 @@ describe("collectAndResolveFall（落下カードの解決・docs/spec.md §6）
 
     collectAndResolveFall(state, 0, [event("extraSlot")], fixedChooser(1), scriptedRng([]));
 
-    expect(state.pendingPoints).toBe(0);
+    expect(pendingPointsOf(state)).toBe(0);
     expect(state.lanes[0]?.stock).toEqual([coin(3)]);
     expect(state.lanes[1]?.hasExtraSlot).toBe(false);
   });
@@ -199,7 +204,7 @@ describe("collectAndResolveFall（落下カードの解決・docs/spec.md §6）
       );
 
       // なだれで 1+2+3、そのあと §6 の「もう1枚落とす」でレーン0 の滞留から押し込まれた 1
-      expect(result.state.pendingPoints).toBe(7);
+      expect(pendingPointsOf(result.state)).toBe(7);
     });
 
     it("なだれで落ちたカードがイベントなら §6 を適用する（ルール解釈メモ）", () => {
@@ -219,7 +224,7 @@ describe("collectAndResolveFall（落下カードの解決・docs/spec.md §6）
 
       expect(result.events.map((e) => e.event)).toEqual(["avalanche", "extraSlot"]);
       // レーン1 から落ちた extraSlot の「もう1枚」で coin(2)
-      expect(result.state.pendingPoints).toBe(2);
+      expect(pendingPointsOf(result.state)).toBe(2);
     });
   });
 
@@ -234,7 +239,7 @@ describe("collectAndResolveFall（落下カードの解決・docs/spec.md §6）
       const chooser: EventChooser = { chooseLane: () => 1, choosePending: () => 1 };
       const result = collectAndResolveFall(state, 0, [event("openLane")], chooser, scriptedRng([]));
 
-      expect(result.state.pendingPoints).toBe(3);
+      expect(pendingPointsOf(result.state)).toBe(3);
       expect(result.state.lanes[1]?.pending).toHaveLength(2);
     });
 
@@ -245,7 +250,7 @@ describe("collectAndResolveFall（落下カードの解決・docs/spec.md §6）
 
       const result = collectAndResolveFall(state, 0, [event("openLane")], chooser, scriptedRng([]));
 
-      expect(result.state.pendingPoints).toBe(0);
+      expect(pendingPointsOf(result.state)).toBe(0);
       expect(choosePending).not.toHaveBeenCalled();
     });
   });
