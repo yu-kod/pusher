@@ -9,6 +9,7 @@
  */
 import { viewFor, type GameView } from "../game/view.js";
 import type { Room, RoomPhase } from "./room.js";
+import { tickViewFor, type TickView } from "./tick-view.js";
 
 export type RoomBody = {
   code: string;
@@ -23,6 +24,13 @@ export type RoomBody = {
   phase: RoomPhase;
   players: { id: string; name: string; isCpu: boolean }[];
   game: GameView | null;
+  /**
+   * いま何拍目で、誰が宣言を済ませたか（docs/realtime.md §8-1）。
+   *
+   * ゲームの盤面とは別に持つ。拍は「同時に届く入力をどう受け、いつ締め切るか」の
+   * 話で、ルールそのものではないため（同 §8 冒頭）。ロビーのあいだは null。
+   */
+  tick: TickView | null;
 };
 
 /**
@@ -36,5 +44,7 @@ export function roomBody(room: Room, viewerId: string): RoomBody {
     phase: room.phase,
     players: room.players.map((p) => ({ id: p.id, name: p.name, isCpu: p.isCpu })),
     game: room.game === null ? null : viewFor(room.game, viewerId),
+    tick:
+      room.game === null || room.tick === null ? null : tickViewFor(room.game, room.tick, viewerId),
   };
 }
