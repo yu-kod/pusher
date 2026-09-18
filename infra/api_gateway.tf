@@ -1,5 +1,5 @@
 # HTTP API。CloudFront の /api/* ビヘイビアから呼ばれる。
-# WebSocket API（ルーム更新の通知）は #15 で追加する。
+# WebSocket API（ルーム更新の通知）は websocket.tf にある。
 resource "aws_apigatewayv2_api" "api" {
   name          = "${var.project_name}-api"
   protocol_type = "HTTP"
