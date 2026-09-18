@@ -12,7 +12,7 @@ import { PAYOUT_DRIFT, tossFrom } from "../cardFlight";
  * ときより広いのは、奥の山がただの厚みではなく、位置の読める列になったため
  * （docs/turn-structure.md §4-3）。
  */
-const STOCK_OFFSET = 9;
+const STOCK_OFFSET = 5;
 /** 滞留エリアで重ねたカードをずらす量（px） */
 const STACK_OFFSET = 9;
 /** 小サイズのカードの高さ（px）。PlayingCard の size="sm" に合わせる */
