@@ -21,6 +21,7 @@ import { ResolutionPanel } from "./components/ResolutionPanel";
 import { DeclarationActions } from "./components/DeclarationActions";
 import { secondsLeft, stepAt } from "./tick";
 import { useNow } from "./useNow";
+import { useFitScale } from "./useFitScale";
 import { assignSeats, type Seat as SeatData, type SeatPosition } from "./seating";
 import { sideHoleHint } from "@/lib/rules";
 import type { Card, Credentials, GameView, PlayerView, TickPhase } from "@/lib/types";
@@ -210,6 +211,10 @@ export function GameBoard({ code, game, credentials, reload }: Props) {
    * 通りかかったリクエストが解決する作りなので、誰も操作していない卓が止まらない
    * ように、クライアントが1回だけ肩を叩く。解決は冪等なので、全員が投げても1回しか進まない。
    */
+  // 卓は人数・レーンの深さ・滞留の枚数で高さが変わる。縦が足りない画面では、
+  // 卓から少し離れて見ているものとして丸ごと縮める
+  const [tableBox, tableScale] = useFitScale();
+
   const nudgedTick = useRef<number | null>(null);
   const tickIndex = tick?.index;
   const deadlineAt = tick?.deadlineAt;
@@ -261,12 +266,22 @@ export function GameBoard({ code, game, credentials, reload }: Props) {
 
       {/* 卓。自分は手前、他のプレイヤーは周り、台は真ん中 */}
       <div className="relative min-h-0 flex-1">
-        <div className="absolute top-1/2 left-1 flex -translate-y-1/2 flex-col gap-2">
+        {/*
+         * 左右の席も卓と同じ倍率で縮める。席だけ原寸だと、向かいの席とちぐはぐになる。
+         * transform ではなく scale を使うのは、-translate-y-1/2 を打ち消さないため
+         */}
+        <div
+          className="absolute top-1/2 left-1 flex -translate-y-1/2 flex-col gap-2"
+          style={{ scale: `${tableScale}` }}
+        >
           {seatsAt("left").map((seat) => (
             <SeatOf key={seat.player.id} seat={seat} movingId={movingId} phase={phase} />
           ))}
         </div>
-        <div className="absolute top-1/2 right-1 flex -translate-y-1/2 flex-col gap-2">
+        <div
+          className="absolute top-1/2 right-1 flex -translate-y-1/2 flex-col gap-2"
+          style={{ scale: `${tableScale}` }}
+        >
           {seatsAt("right").map((seat) => (
             <SeatOf key={seat.player.id} seat={seat} movingId={movingId} phase={phase} />
           ))}
@@ -277,45 +292,53 @@ export function GameBoard({ code, game, credentials, reload }: Props) {
          * レーンが深くなったぶんだけ台が伸びて席に乗り上げる。左右の席は
          * 上下の中央に貼りつくので、縦には干渉しない
          */}
-        <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 px-[4.5rem] py-1">
-          {seatsAt("top").length > 0 && (
-            <div className="flex shrink-0 justify-center gap-2">
-              {seatsAt("top").map((seat) => (
-                <SeatOf key={seat.player.id} seat={seat} movingId={movingId} phase={phase} />
-              ))}
-            </div>
-          )}
-
-          <Piles drawCount={game.drawPileCount} discardCount={game.discardPileCount} />
-
-          <section
-            aria-label="プッシャー台"
-            className="grid gap-2 rounded-xl border-4 border-[#5c3a21] bg-[#3b2515] p-2 shadow-[0_6px_16px_rgba(0,0,0,0.5)]"
-            style={{ gridTemplateColumns: `repeat(${game.lanes.length}, minmax(0, 1fr))` }}
+        <div
+          ref={tableBox}
+          className="absolute inset-0 flex flex-col items-center justify-center px-[4.5rem] py-1"
+        >
+          <div
+            className="flex flex-col items-center gap-2"
+            style={{ transform: `scale(${tableScale})`, transformOrigin: "center" }}
           >
-            {game.lanes.map((lane, index) => (
-              <Lane
-                key={index}
-                lane={lane}
-                index={index}
-                laneCount={game.lanes.length}
-                target={targetFor(index)}
-                risky={riskyFor(targetFor(index))}
-                selected={selectedLane === index}
-                disabled={choosingDisabled}
-                onSelect={() => setSelectedLane(index)}
-                flight={
-                  flight !== null && flight.laneIndex === index && result !== null
-                    ? { seq: resultSeq, card: flight.card, gained: result.gainedPoints }
-                    : null
-                }
-              />
-            ))}
-          </section>
+            {seatsAt("top").length > 0 && (
+              <div className="flex shrink-0 justify-center gap-2">
+                {seatsAt("top").map((seat) => (
+                  <SeatOf key={seat.player.id} seat={seat} movingId={movingId} phase={phase} />
+                ))}
+              </div>
+            )}
 
-          <p className="text-center text-[11px] text-red-200">
-            {sideHoleHint(game.rules.sideHole)} — 未確定得点はジャックポットへ
-          </p>
+            <Piles drawCount={game.drawPileCount} discardCount={game.discardPileCount} />
+
+            <section
+              aria-label="プッシャー台"
+              className="grid gap-2 rounded-xl border-4 border-[#5c3a21] bg-[#3b2515] p-2 shadow-[0_6px_16px_rgba(0,0,0,0.5)]"
+              style={{ gridTemplateColumns: `repeat(${game.lanes.length}, minmax(0, 1fr))` }}
+            >
+              {game.lanes.map((lane, index) => (
+                <Lane
+                  key={index}
+                  lane={lane}
+                  index={index}
+                  laneCount={game.lanes.length}
+                  target={targetFor(index)}
+                  risky={riskyFor(targetFor(index))}
+                  selected={selectedLane === index}
+                  disabled={choosingDisabled}
+                  onSelect={() => setSelectedLane(index)}
+                  flight={
+                    flight !== null && flight.laneIndex === index && result !== null
+                      ? { seq: resultSeq, card: flight.card, gained: result.gainedPoints }
+                      : null
+                  }
+                />
+              ))}
+            </section>
+
+            <p className="text-center text-[11px] text-red-200">
+              {sideHoleHint(game.rules.sideHole)} — 未確定得点はジャックポットへ
+            </p>
+          </div>
         </div>
 
         {phase === "revealing" && <RevealPanel players={game.players} />}
