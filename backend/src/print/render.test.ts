@@ -70,7 +70,7 @@ describe("renderCardSheets", () => {
   it("卓上版一式をそのまま刷れる", () => {
     const html = renderCardSheets(buildTabletopKit());
 
-    // メインデッキ90枚 + ボール札3枚 + 各自5枚×4人 = 113枚
-    expect(html.match(/class="card /g)).toHaveLength(113);
+    // メインデッキ104枚 + ボール札3枚 + 各自5枚×4人 = 127枚
+    expect(html.match(/class="card /g)).toHaveLength(127);
   });
 });

@@ -1,9 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT_DECK_CONFIG, EVENT_KINDS } from "../game/deck.js";
+import { DEFAULT_DECK_CONFIG, EVENT_KINDS, createDeck } from "../game/deck.js";
 import {
   BALL_CARD_POINTS,
   LANE_NAMES,
   SEATS,
+  TABLETOP_BALANCE,
   buildBallCards,
   buildDeckCards,
   buildSeatCards,
@@ -64,6 +65,15 @@ describe("buildSeatCards", () => {
   });
 });
 
+describe("TABLETOP_BALANCE", () => {
+  it("採用案 A''（深いレーン）を刷る（#104）", () => {
+    expect(TABLETOP_BALANCE.initialLaneCards).toBe(12);
+    expect(TABLETOP_BALANCE.useBallCards).toBe(true);
+    // デッキ104枚。既定値（90枚）ではなくプリセットが出典
+    expect(createDeck(TABLETOP_BALANCE.deck)).toHaveLength(104);
+  });
+});
+
 describe("buildTabletopKit", () => {
   it("メインデッキ・ボール札・各自のカードをこの順で束にする", () => {
     const kit = buildTabletopKit();
@@ -73,8 +83,8 @@ describe("buildTabletopKit", () => {
       "ボール札",
       "各プレイヤーのカード",
     ]);
-    expect(kit[0]?.cards).toHaveLength(90);
-    expect(kit[1]?.cards).toHaveLength(3);
+    expect(kit[0]?.cards).toHaveLength(104);
+    expect(kit[1]?.cards).toHaveLength(TABLETOP_BALANCE.laneCount);
     expect(kit[2]?.cards).toHaveLength(SEATS.length * 5);
   });
 });
