@@ -5,13 +5,11 @@ import {
   declareInsert,
   declareWithdraw,
   fetchRoom,
-  insertCard,
   joinRoom,
   removeCpu,
   resolveTick,
   retractDeclaration,
   startGame,
-  stopTurn,
 } from "./api";
 
 function mockFetch(status: number, body: unknown) {
@@ -126,44 +124,6 @@ describe("removeCpu", () => {
   });
 });
 
-describe("insertCard", () => {
-  it("レーンと手札の添字を送る", async () => {
-    const fetchMock = mockFetch(200, {
-      code: "ABCDEF",
-      phase: "playing",
-      players: [],
-      game: null,
-      result: {
-        lanes: [],
-        gainedPoints: 0,
-        busted: false,
-        canContinue: true,
-        events: [],
-        jackpot: null,
-      },
-    });
-
-    await insertCard("ABCDEF", "t1", 1, [2]);
-
-    expect(fetchMock.mock.calls[0]?.[0]).toBe("/api/rooms/ABCDEF/turns/insert");
-    expect(fetchMock.mock.calls[0]?.[1]).toMatchObject({
-      method: "POST",
-      body: JSON.stringify({ laneIndex: 1, handIndexes: [2] }),
-      headers: { Authorization: "Bearer t1" },
-    });
-  });
-});
-
-describe("stopTurn", () => {
-  it("やめるを要求する", async () => {
-    const fetchMock = mockFetch(200, { code: "ABCDEF", phase: "playing", players: [], game: null });
-
-    await stopTurn("ABCDEF", "t1");
-
-    expect(fetchMock.mock.calls[0]?.[0]).toBe("/api/rooms/ABCDEF/turns/stop");
-  });
-});
-
 const ROOM = { code: "ABCDEF", phase: "playing", players: [], game: null };
 
 describe("declareInsert", () => {
@@ -175,7 +135,7 @@ describe("declareInsert", () => {
     expect(fetchMock.mock.calls[0]?.[0]).toBe("/api/rooms/ABCDEF/ticks/3/declarations");
     expect(fetchMock.mock.calls[0]?.[1]).toMatchObject({
       method: "POST",
-      body: JSON.stringify({ kind: "insert", laneIndex: 1, handIndex: 2, key: "k-1" }),
+      body: JSON.stringify({ kind: "insert", laneIndex: 1, handIndexes: [2], key: "k-1" }),
       headers: { Authorization: "Bearer t1" },
     });
   });

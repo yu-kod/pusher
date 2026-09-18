@@ -68,38 +68,6 @@ export function removeCpu(code: string, playerId: string, token: string): Promis
   return request<RoomView>(`/api/rooms/${code}/players/${playerId}`, { method: "DELETE" }, token);
 }
 
-/** 投入ラウンドの結果（サーバーの InsertResultBody に対応する） */
-export type InsertResult = {
-  lanes: {
-    laneIndex: number;
-    roll: number;
-    outcome: "success" | "failure" | "sideHole";
-    target: number;
-  }[];
-  gainedPoints: number;
-  busted: boolean;
-  canContinue: boolean;
-  events: { event: string; extraTurn: boolean }[];
-  jackpot: { roll: number; won: boolean; wonPoints: number } | null;
-};
-
-export function insertCard(
-  code: string,
-  token: string,
-  laneIndex: number,
-  handIndexes: number[]
-): Promise<RoomView & { result: InsertResult }> {
-  return request<RoomView & { result: InsertResult }>(
-    `/api/rooms/${code}/turns/insert`,
-    { method: "POST", body: JSON.stringify({ laneIndex, handIndexes }) },
-    token
-  );
-}
-
-export function stopTurn(code: string, token: string): Promise<RoomView> {
-  return request<RoomView>(`/api/rooms/${code}/turns/stop`, { method: "POST", body: "{}" }, token);
-}
-
 /**
  * 宣言を送る（docs/realtime.md §8-4）。
  *
@@ -120,7 +88,10 @@ export function declareInsert(
 ): Promise<RoomView> {
   return request<RoomView>(
     `/api/rooms/${code}/ticks/${tick}/declarations`,
-    { method: "POST", body: JSON.stringify({ kind: "insert", laneIndex, handIndex, key }) },
+    {
+      method: "POST",
+      body: JSON.stringify({ kind: "insert", laneIndex, handIndexes: [handIndex], key }),
+    },
     token
   );
 }

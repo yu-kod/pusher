@@ -1,4 +1,3 @@
-import { cardLabel } from "@/lib/cards";
 import { laneName } from "@/lib/rules";
 import type { DeclarationView } from "@/lib/types";
 
@@ -36,7 +35,7 @@ export function DeclarationActions({
         <span className="min-w-0 flex-1 truncate text-[13px]">
           {declared.kind === "withdraw"
             ? "降りると宣言しました"
-            : `${laneName(declared.laneIndex)}へ ${cardLabel(declared.card)} で宣言しました`}
+            : `${laneName(declared.laneIndex)}レーンへ投入すると宣言しました`}
         </span>
         <button
           type="button"

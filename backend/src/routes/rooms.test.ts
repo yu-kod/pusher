@@ -225,229 +225,296 @@ async function startedRoom() {
   return started;
 }
 
-/** 手番プレイヤーのトークンを返す */
-async function currentToken(app: ReturnType<typeof createApp>, code: string, tokens: string[]) {
-  const body = (await (await app.request(`/api/rooms/${code}`)).json()) as {
-    game: { currentPlayerIndex: number };
-  };
-  return tokens[body.game.currentPlayerIndex] ?? "";
+type Snapshot = {
+  phase: string;
+  game: {
+    round: number;
+    players: { points: number; hand: { cards?: { kind: string }[]; count?: number } }[];
+  } | null;
+  tick: {
+    index: number;
+    phase: string;
+    players: { id: string; declared: boolean; declaration: unknown }[];
+    steps: { playerIndex: number }[];
+  } | null;
+};
+
+async function snapshot(
+  app: ReturnType<typeof createApp>,
+  code: string,
+  token?: string
+): Promise<Snapshot> {
+  const res = await app.request(`/api/rooms/${code}`, {
+    headers: token === undefined ? {} : { Authorization: `Bearer ${token}` },
+  });
+  return (await res.json()) as Snapshot;
 }
 
 /**
- * 手番プレイヤーのトークンと、投入できる手札の添字を返す。
+ * そのプレイヤーが投入できる手札の添字を返す。
  *
  * 配られる手札にはイベントカードが混ざりうるので、コインカードを選ぶ必要がある。
  */
-async function currentTurn(app: ReturnType<typeof createApp>, code: string, tokens: string[]) {
-  const token = await currentToken(app, code, tokens);
-  const body = (await (
-    await app.request(`/api/rooms/${code}`, { headers: { Authorization: `Bearer ${token}` } })
-  ).json()) as { game: { players: { hand: { cards?: { kind: string }[] } }[] } };
-
-  const cards = body.game.players.flatMap((p) => p.hand.cards ?? []);
-  const handIndex = cards.findIndex((card) => card.kind === "coin");
-  return { token, handIndex, handSize: cards.length };
+async function handIndexOf(app: ReturnType<typeof createApp>, code: string, token: string) {
+  const body = await snapshot(app, code, token);
+  const cards = body.game?.players.flatMap((p) => p.hand.cards ?? []) ?? [];
+  return cards.findIndex((card) => card.kind === "coin");
 }
 
-describe("POST /api/rooms/:code/turns/insert（投入）", () => {
-  it("200 で投入ラウンドの結果を返す", async () => {
+function declare(
+  app: ReturnType<typeof createApp>,
+  code: string,
+  token: string,
+  tick: number,
+  body: unknown
+) {
+  return post(app, `/api/rooms/${code}/ticks/${tick}/declarations`, body, token);
+}
+
+/** そのプレイヤーが「投入する」を宣言する */
+async function declareInsert(
+  app: ReturnType<typeof createApp>,
+  code: string,
+  token: string,
+  tick: number,
+  laneIndex = 0
+) {
+  const handIndex = await handIndexOf(app, code, token);
+  return declare(app, code, token, tick, {
+    kind: "insert",
+    laneIndex,
+    handIndexes: [handIndex],
+    key: `${token}-${tick}`,
+  });
+}
+
+describe("POST /api/rooms/:code/ticks/:tick/declarations（宣言）", () => {
+  it("200 で宣言済みになる", async () => {
     const { app, code, tokens } = await startedRoom();
 
-    const { token, handIndex } = await currentTurn(app, code, tokens);
-
-    const res = await post(
-      app,
-      `/api/rooms/${code}/turns/insert`,
-      { laneIndex: 0, handIndexes: [handIndex] },
-      token
-    );
+    const res = await declareInsert(app, code, tokens[0] ?? "", 0);
 
     expect(res.status).toBe(200);
-    const body = (await res.json()) as {
-      result: { lanes: { roll: number; outcome: string; laneIndex: number }[] };
-    };
-    const lane = body.result.lanes[0];
-    expect(body.result.lanes).toHaveLength(1);
-    expect(lane?.laneIndex).toBe(0);
-    expect(lane?.roll).toBeGreaterThanOrEqual(1);
-    expect(lane?.roll).toBeLessThanOrEqual(6);
-    expect(["success", "failure", "sideHole"]).toContain(lane?.outcome);
+    const body = (await res.json()) as Snapshot;
+    expect(body.tick?.players[0]?.declared).toBe(true);
   });
 
-  it("投入したカードが手札から減る", async () => {
+  it("中身は宣言した本人にしか見えない（docs/realtime.md §8-3）", async () => {
     const { app, code, tokens } = await startedRoom();
-    const token = await currentToken(app, code, tokens);
+    await declareInsert(app, code, tokens[0] ?? "", 0);
 
-    const res = await post(
-      app,
-      `/api/rooms/${code}/turns/insert`,
-      { laneIndex: 0, handIndexes: [0] },
-      token
-    );
+    const other = await snapshot(app, code, tokens[1]);
 
-    const body = (await res.json()) as { game: { players: { hand: { cards?: unknown[] } }[] } };
-    const me = body.game.players.find((p) => p.hand.cards !== undefined);
-    expect(me?.hand.cards).toHaveLength(4);
+    expect(other.tick?.players[0]).toMatchObject({ declared: true, declaration: null });
   });
 
-  it("手番でないプレイヤーは 422", async () => {
+  it("全員が宣言すると、締め切りを待たずに公開の拍へ進む（§8-2）", async () => {
     const { app, code, tokens } = await startedRoom();
-    const current = await currentToken(app, code, tokens);
-    const other = tokens.find((t) => t !== current) ?? "";
 
-    const res = await post(
-      app,
-      `/api/rooms/${code}/turns/insert`,
-      { laneIndex: 0, handIndexes: [0] },
-      other
-    );
+    await declareInsert(app, code, tokens[0] ?? "", 0);
+    await declareInsert(app, code, tokens[1] ?? "", 0, 1);
+    const res = await declareInsert(app, code, tokens[2] ?? "", 0, 2);
 
-    expect(res.status).toBe(422);
-    await expect(res.json()).resolves.toMatchObject({
-      error: { message: expect.stringContaining("手番") },
-    });
+    const body = (await res.json()) as Snapshot;
+    expect(body.tick?.phase).toBe("revealing");
+    expect(body.tick?.steps).toHaveLength(3);
   });
 
-  it("ロビーのままなら 422", async () => {
-    const { app, code, tokens } = await withRoom();
+  it("「降りる」を宣言できる（docs/spec.md §3）", async () => {
+    const { app, code, tokens } = await startedRoom();
 
-    const res = await post(
-      app,
-      `/api/rooms/${code}/turns/insert`,
-      { laneIndex: 0, handIndexes: [0] },
-      tokens[0]
-    );
+    const res = await declare(app, code, tokens[0] ?? "", 0, { kind: "withdraw", key: "w0" });
 
-    expect(res.status).toBe(422);
+    expect(res.status).toBe(200);
+  });
+
+  it("同じ冪等キーの再送は二重に宣言しない（§8-4）", async () => {
+    const { app, code, tokens } = await startedRoom();
+    const body = { kind: "withdraw", key: "same" };
+
+    await declare(app, code, tokens[0] ?? "", 0, body);
+    const res = await declare(app, code, tokens[0] ?? "", 0, body);
+
+    const snap = (await res.json()) as Snapshot;
+    expect(snap.tick?.players.filter((p) => p.declared)).toHaveLength(1);
   });
 
   it("存在しないレーンなら 422", async () => {
     const { app, code, tokens } = await startedRoom();
 
-    const res = await post(
-      app,
-      `/api/rooms/${code}/turns/insert`,
-      { laneIndex: 9, handIndexes: [0] },
-      await currentToken(app, code, tokens)
-    );
+    const res = await declare(app, code, tokens[0] ?? "", 0, {
+      kind: "insert",
+      laneIndex: 99,
+      handIndexes: [0],
+      key: "k",
+    });
 
     expect(res.status).toBe(422);
+  });
+
+  it("閉じたティックへの宣言は 409", async () => {
+    const { app, code, tokens } = await startedRoom();
+
+    const res = await declare(app, code, tokens[0] ?? "", 99, { kind: "withdraw", key: "k" });
+
+    expect(res.status).toBe(409);
   });
 
   it("body の形式が不正なら 400", async () => {
     const { app, code, tokens } = await startedRoom();
 
-    const res = await post(
-      app,
-      `/api/rooms/${code}/turns/insert`,
-      { laneIndex: "zero" },
-      await currentToken(app, code, tokens)
-    );
+    expect((await declare(app, code, tokens[0] ?? "", 0, { kind: "insert" })).status).toBe(400);
+  });
 
-    expect(res.status).toBe(400);
+  it("冪等キーがなければ 400", async () => {
+    const { app, code, tokens } = await startedRoom();
+
+    expect((await declare(app, code, tokens[0] ?? "", 0, { kind: "withdraw" })).status).toBe(400);
   });
 
   it("トークンがなければ 401", async () => {
     const { app, code } = await startedRoom();
 
-    const res = await post(app, `/api/rooms/${code}/turns/insert`, {
-      laneIndex: 0,
-      handIndexes: [0],
+    const res = await post(app, `/api/rooms/${code}/ticks/0/declarations`, {
+      kind: "withdraw",
+      key: "k",
     });
 
     expect(res.status).toBe(401);
   });
 
-  it("続けられなくなったら手番が移る", async () => {
-    const { app, code, tokens } = await startedRoom();
+  it("ロビーのままなら 422", async () => {
+    const { app, code, tokens } = await withRoom();
 
-    // 手札 5枚を使い切るまで投入すれば、遅くともそこで手番が終わる
-    let moved = false;
-    for (let i = 0; i < 6 && !moved; i++) {
-      const token = await currentToken(app, code, tokens);
-      const res = await post(
-        app,
-        `/api/rooms/${code}/turns/insert`,
-        { laneIndex: 0, handIndexes: [0] },
-        token
-      );
-      const body = (await res.json()) as {
-        result: { canContinue: boolean };
-        game: { currentPlayerIndex: number };
-      };
-      moved = !body.result.canContinue && body.game.currentPlayerIndex !== 0;
-    }
-
-    expect(moved).toBe(true);
-  });
-});
-
-describe("POST /api/rooms/:code/turns/stop（やめる）", () => {
-  it("未確定得点が確定して手番が移る（docs/spec.md §3）", async () => {
-    const { app, code, tokens } = await startedRoom();
-    const { token, handIndex } = await currentTurn(app, code, tokens);
-    await post(
-      app,
-      `/api/rooms/${code}/turns/insert`,
-      { laneIndex: 0, handIndexes: [handIndex] },
-      token
-    );
-
-    const res = await post(app, `/api/rooms/${code}/turns/stop`, {}, token);
-
-    expect(res.status).toBe(200);
-    const body = (await res.json()) as {
-      game: { pendingPoints: number; currentPlayerIndex: number };
-    };
-    expect(body.game.pendingPoints).toBe(0);
-    expect(body.game.currentPlayerIndex).toBe(1);
-  });
-
-  it("1回も投入していなければ 422（パスはできない）", async () => {
-    const { app, code, tokens } = await startedRoom();
-
-    const res = await post(
-      app,
-      `/api/rooms/${code}/turns/stop`,
-      {},
-      await currentToken(app, code, tokens)
-    );
+    const res = await declare(app, code, tokens[0] ?? "", 0, { kind: "withdraw", key: "k" });
 
     expect(res.status).toBe(422);
   });
+});
 
-  it("手番でないプレイヤーは 422", async () => {
+describe("DELETE /api/rooms/:code/ticks/:tick/declarations（宣言の取り消し）", () => {
+  function del(app: ReturnType<typeof createApp>, code: string, token: string, tick: number) {
+    return app.request(`/api/rooms/${code}/ticks/${tick}/declarations`, {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${token}` },
+    });
+  }
+
+  it("締め切りまでは何度でも決め直せる", async () => {
     const { app, code, tokens } = await startedRoom();
-    const current = await currentToken(app, code, tokens);
-    const other = tokens.find((t) => t !== current) ?? "";
+    await declare(app, code, tokens[0] ?? "", 0, { kind: "withdraw", key: "k" });
 
-    expect((await post(app, `/api/rooms/${code}/turns/stop`, {}, other)).status).toBe(422);
+    const res = await del(app, code, tokens[0] ?? "", 0);
+
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as Snapshot;
+    expect(body.tick?.players[0]?.declared).toBe(false);
+  });
+
+  it("閉じたティックなら 409", async () => {
+    const { app, code, tokens } = await startedRoom();
+
+    expect((await del(app, code, tokens[0] ?? "", 99)).status).toBe(409);
+  });
+
+  it("トークンがなければ 401", async () => {
+    const { app, code } = await startedRoom();
+
+    const res = await app.request(`/api/rooms/${code}/ticks/0/declarations`, { method: "DELETE" });
+
+    expect(res.status).toBe(401);
+  });
+});
+
+/**
+ * 時計を進められるアプリで3人のゲームを開始する。
+ *
+ * 締め切りも演出の終わりも時刻で決まるので（docs/realtime.md §8-2）、
+ * 拍をまたぐテストは時計を進める必要がある。
+ */
+async function withClock(cpuNames: readonly string[] = []) {
+  let clock = 1_700_000_000_000;
+  const app = createApp({ store: createInMemoryRoomStore(), seed: 1, now: () => clock });
+
+  const created = await post(app, "/api/rooms", { name: "A" });
+  const { code, token } = (await created.json()) as { code: string; token: string };
+  const tokens = [token];
+  const names = cpuNames.length > 0 ? cpuNames : ["B", "C"];
+  for (const name of names) {
+    const res = await post(app, `/api/rooms/${code}/players`, {
+      name,
+      isCpu: cpuNames.length > 0,
+    });
+    tokens.push(((await res.json()) as { token: string }).token);
+  }
+  await post(app, `/api/rooms/${code}/start`, {}, tokens[0]);
+
+  return { app, code, tokens, advance: (ms: number) => (clock += ms) };
+}
+
+describe("POST /api/rooms/:code/ticks/:tick/resolve（締め切りの肩を叩く）", () => {
+  it("誰も宣言しないまま締め切りを過ぎたら、肩を叩けば進む（docs/realtime.md §8-2）", async () => {
+    const { app, code, tokens, advance } = await withClock();
+    advance(60_000);
+
+    const res = await post(app, `/api/rooms/${code}/ticks/0/resolve`, {}, tokens[0]);
+
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as Snapshot;
+    expect(body.tick?.phase).toBe("revealing");
+  });
+
+  it("締め切り前なら何も起きない", async () => {
+    const { app, code, tokens } = await withClock();
+
+    const res = await post(app, `/api/rooms/${code}/ticks/0/resolve`, {}, tokens[0]);
+
+    expect(((await res.json()) as Snapshot).tick?.phase).toBe("declaring");
+  });
+
+  it("すでに次のティックへ進んでいたら、いまの状態を返すだけ（409 にしない）", async () => {
+    const { app, code, tokens } = await withClock();
+
+    const res = await post(app, `/api/rooms/${code}/ticks/99/resolve`, {}, tokens[0]);
+
+    expect(res.status).toBe(200);
+    expect(((await res.json()) as Snapshot).tick?.index).toBe(0);
+  });
+
+  it("トークンがなければ 401", async () => {
+    const { app, code } = await startedRoom();
+
+    expect((await post(app, `/api/rooms/${code}/ticks/0/resolve`, {})).status).toBe(401);
   });
 });
 
 describe("ラウンドの進行", () => {
-  it("全員が手番を終えるとラウンドが進み、全員がドローする（docs/spec.md §3）", async () => {
-    const { app, code, tokens } = await startedRoom();
+  it("全員が降りるとラウンドが進む（docs/spec.md §3）", async () => {
+    const { app, code, tokens, advance } = await withClock();
 
-    // 3人それぞれ 1回投入してやめる
-    for (let i = 0; i < 3; i++) {
-      const { token, handIndex } = await currentTurn(app, code, tokens);
-      await post(
-        app,
-        `/api/rooms/${code}/turns/insert`,
-        { laneIndex: 0, handIndexes: [handIndex] },
-        token
-      );
-      // 続けられる場合だけ「やめる」を送る（横穴や手札切れなら手番はすでに移っている）
-      await post(app, `/api/rooms/${code}/turns/stop`, {}, token);
+    // 3人とも降りる。投入が無いので解決するステップも無く、演出はすぐ終わる
+    for (const [i, token] of tokens.entries()) {
+      await declare(app, code, token, 0, { kind: "withdraw", key: `w${i}` });
     }
+    advance(60_000);
+    await post(app, `/api/rooms/${code}/ticks/0/resolve`, {}, tokens[0]);
 
-    const body = (await (await app.request(`/api/rooms/${code}`)).json()) as {
-      game: { round: number; currentPlayerIndex: number };
-    };
-    expect(body.game.round).toBe(2);
-    // ラウンドが進むとスタートプレイヤーが交代する（#54）
-    expect(body.game.currentPlayerIndex).toBe(1);
+    const body = await snapshot(app, code, tokens[0]);
+    expect(body.game?.round).toBe(2);
+    expect(body.tick?.index).toBe(1);
+  });
+
+  it("次のラウンドでは全員がまた参加している", async () => {
+    const { app, code, tokens, advance } = await withClock();
+    for (const [i, token] of tokens.entries()) {
+      await declare(app, code, token, 0, { kind: "withdraw", key: `w${i}` });
+    }
+    advance(60_000);
+    await post(app, `/api/rooms/${code}/ticks/0/resolve`, {}, tokens[0]);
+
+    const res = await declareInsert(app, code, tokens[0] ?? "", 1);
+
+    expect(res.status).toBe(200);
   });
 });
 
@@ -503,80 +570,55 @@ describe("ボディが JSON でない場合", () => {
     expect((await postRaw(app, `/api/rooms/${code}/players`)).status).toBe(400);
   });
 
-  it("投入は 400", async () => {
+  it("宣言は 400", async () => {
     const { app, code, tokens } = await startedRoom();
 
-    const res = await postRaw(
-      app,
-      `/api/rooms/${code}/turns/insert`,
-      await currentToken(app, code, tokens)
-    );
+    const res = await postRaw(app, `/api/rooms/${code}/ticks/0/declarations`, tokens[0]);
 
     expect(res.status).toBe(400);
   });
 });
 
 describe("CPU プレイヤー（#16）", () => {
-  /** 人間1人 + CPU2人でゲームを開始する */
-  async function withCpus() {
-    const app = createApp({ store: createInMemoryRoomStore(), seed: 1 });
-    const created = await post(app, "/api/rooms", { name: "あなた" });
-    const { code, token } = (await created.json()) as { code: string; token: string };
-    await post(app, `/api/rooms/${code}/players`, { name: "CPU1", isCpu: true });
-    await post(app, `/api/rooms/${code}/players`, { name: "CPU2", isCpu: true });
-    await post(app, `/api/rooms/${code}/start`, {}, token);
-    return { app, code, token };
-  }
+  it("ゲームが始まった時点で、CPU はもう宣言を済ませている", async () => {
+    const { app, code, tokens } = await withClock(["CPU1", "CPU2"]);
 
-  it("人間がやめると CPU の手番が自動で進み、人間へ戻ってくる", async () => {
-    const { app, code, token } = await withCpus();
-    const { handIndex } = await currentTurn(app, code, [token]);
-    await post(
-      app,
-      `/api/rooms/${code}/turns/insert`,
-      { laneIndex: 0, handIndexes: [handIndex] },
-      token
-    );
+    const body = await snapshot(app, code, tokens[0]);
 
-    const res = await post(app, `/api/rooms/${code}/turns/stop`, {}, token);
+    expect(body.tick?.players.map((p) => p.declared)).toEqual([false, true, true]);
+  });
 
-    const body = (await res.json()) as { game: { currentPlayerIndex: number; round: number } };
-    // CPU 2人が打ち終わってラウンドも進み、手番は人間（p1）へ戻る
-    expect(body.game.currentPlayerIndex).toBe(0);
-    expect(body.game.round).toBe(2);
+  it("人間が宣言すると、その場で全員ぶんが解決する", async () => {
+    const { app, code, tokens } = await withClock(["CPU1", "CPU2"]);
+
+    const res = await declareInsert(app, code, tokens[0] ?? "", 0);
+
+    const body = (await res.json()) as Snapshot;
+    expect(body.tick?.phase).toBe("revealing");
+    expect(body.tick?.steps.length).toBeGreaterThan(0);
+  });
+
+  it("CPU の宣言の中身は、公開の拍まで人間に見えない（docs/realtime.md §8-3）", async () => {
+    const { app, code, tokens } = await withClock(["CPU1", "CPU2"]);
+
+    const body = await snapshot(app, code, tokens[0]);
+
+    expect(body.tick?.players.slice(1).every((p) => p.declaration === null)).toBe(true);
   });
 
   it("CPU が得点を積む", async () => {
-    const { app, code, token } = await withCpus();
-    const { handIndex } = await currentTurn(app, code, [token]);
-    await post(
-      app,
-      `/api/rooms/${code}/turns/insert`,
-      { laneIndex: 0, handIndexes: [handIndex] },
-      token
-    );
-    await post(app, `/api/rooms/${code}/turns/stop`, {}, token);
+    const { app, code, tokens, advance } = await withClock(["CPU1", "CPU2"]);
 
-    const body = (await (await app.request(`/api/rooms/${code}`)).json()) as {
-      game: { players: { name: string; points: number }[] };
-    };
-    expect(
-      body.game.players.filter((p) => p.name.startsWith("CPU")).some((p) => p.points > 0)
-    ).toBe(true);
-  });
+    // 人間は降り続け、CPU だけがラウンドを回す
+    for (let tick = 0; tick < 6; tick++) {
+      await declare(app, code, tokens[0] ?? "", tick, { kind: "withdraw", key: `w${tick}` });
+      advance(60_000);
+      await post(app, `/api/rooms/${code}/ticks/${tick}/resolve`, {}, tokens[0]);
+    }
 
-  it("ゲーム開始時に手番が CPU なら、その場で人間まで進む", async () => {
-    const app = createApp({ store: createInMemoryRoomStore(), seed: 1 });
-    const created = await post(app, "/api/rooms", { name: "CPU1", isCpu: true });
-    const { code } = (await created.json()) as { code: string };
-    const joined = await post(app, `/api/rooms/${code}/players`, { name: "あなた" });
-    const { token } = (await joined.json()) as { token: string };
-    await post(app, `/api/rooms/${code}/players`, { name: "CPU2", isCpu: true });
-
-    const res = await post(app, `/api/rooms/${code}/start`, {}, token);
-
-    const body = (await res.json()) as { game: { currentPlayerIndex: number } };
-    expect(body.game.currentPlayerIndex).toBe(1);
+    const body = await snapshot(app, code, tokens[0]);
+    const cpuPoints = body.game?.players.slice(1).map((p) => p.points) ?? [];
+    expect(cpuPoints.some((points) => points > 0)).toBe(true);
   });
 });
 

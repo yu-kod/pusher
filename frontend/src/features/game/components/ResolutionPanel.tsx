@@ -22,19 +22,20 @@ export function ResolutionPanel({ step, name }: Props) {
       aria-live="polite"
       className="animate-slide-up absolute inset-x-2 bottom-2 mx-auto flex max-w-md items-center gap-3 rounded-lg bg-black/75 px-3 py-2 text-sm backdrop-blur-[2px]"
     >
-      <Die value={step.roll} className="animate-die-roll" />
-
       <div className="min-w-0 flex-1">
-        <p className="flex items-center gap-2">
-          <span className="truncate font-bold text-amber-200">{name}</span>
-          <span className="text-emerald-50/70">{laneName(step.laneIndex)}レーン</span>
-        </p>
-        <p className="mt-1 text-[12px] text-emerald-50/70">
-          押し込み {step.pushedCount}枚 / 落下 {step.droppedCount}枚
-        </p>
+        <p className="truncate font-bold text-amber-200">{name}</p>
+        {step.lanes.map((lane) => (
+          <p key={lane.laneIndex} className="mt-1 flex items-center gap-2 text-[12px]">
+            <Die value={lane.roll} className="animate-die-roll" />
+            <span className="text-emerald-50/70">{laneName(lane.laneIndex)}レーン</span>
+            <span className="text-emerald-50/70">
+              目標値 {lane.target} / 落下 {lane.droppedCount}枚
+            </span>
+          </p>
+        ))}
       </div>
 
-      {step.sideHole ? (
+      {step.busted ? (
         <span className="shrink-0 rounded bg-red-300 px-1.5 py-0.5 text-[12px] font-bold text-red-950">
           横穴
         </span>

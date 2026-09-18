@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { secondsLeft, stepAt } from "./tick";
-import type { ResolutionStepView } from "../../lib/types";
+import { buildStep } from "@/test-utils/game";
+import type { ResolutionStepView } from "@/lib/types";
 
 describe("secondsLeft", () => {
   it("締め切りまでの残りを秒で返す", () => {
@@ -20,26 +21,7 @@ describe("secondsLeft", () => {
   });
 });
 
-const steps: ResolutionStepView[] = [
-  {
-    playerId: "a",
-    laneIndex: 0,
-    roll: 3,
-    pushedCount: 2,
-    droppedCount: 1,
-    gainedPoints: 2,
-    sideHole: false,
-  },
-  {
-    playerId: "b",
-    laneIndex: 1,
-    roll: 6,
-    pushedCount: 1,
-    droppedCount: 0,
-    gainedPoints: 0,
-    sideHole: true,
-  },
-];
+const steps: ResolutionStepView[] = [buildStep({ playerIndex: 0 }), buildStep({ playerIndex: 1 })];
 
 describe("stepAt", () => {
   it("解決が始まった瞬間は先頭のステップ", () => {

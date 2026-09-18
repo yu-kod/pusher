@@ -1,8 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { DEFAULT_BALANCE } from "../game/balance.js";
 import { createRng } from "../game/rng.js";
-import type { GameState } from "../game/setup.js";
-import { playCpuTurns } from "./cpu.js";
+import { declareForCpus } from "./cpu.js";
 import { createRoom, joinRoom, startGame, type Room } from "./room.js";
 
 const NOW = 1_700_000_000_000;
@@ -16,108 +15,65 @@ function startedRoom(cpuFlags: readonly boolean[]): Room {
   return startGame(lobby, createRng(1), DEFAULT_BALANCE, NOW);
 }
 
-/** 手番プレイヤーの id */
-function currentId(game: GameState): string {
-  return game.players[game.currentPlayerIndex]?.id ?? "";
-}
+const seatsDeclared = (room: Room) => room.tick?.declarations.map((d) => d.playerIndex).sort();
 
-describe("playCpuTurns", () => {
-  it("手番が人間ならそのまま返す", () => {
+describe("declareForCpus", () => {
+  it("CPU のぶんだけ宣言する", () => {
+    const room = startedRoom([false, true, true]);
+
+    expect(seatsDeclared(declareForCpus(room, createRng(1), NOW))).toEqual([1, 2]);
+  });
+
+  it("全員が人間なら何もしない", () => {
     const room = startedRoom([false, false, false]);
 
-    expect(playCpuTurns(room, createRng(1), NOW)).toEqual(room);
+    expect(declareForCpus(room, createRng(1), NOW)).toBe(room);
   });
 
-  it("手番が CPU なら人間の手番まで進める", () => {
-    const room = startedRoom([false, true, true]);
-    const afterHuman = { ...room, game: { ...room.game!, currentPlayerIndex: 1 } };
+  it("二重に宣言しない", () => {
+    const once = declareForCpus(startedRoom([false, true, true]), createRng(1), NOW);
 
-    const next = playCpuTurns(afterHuman, createRng(1), NOW);
-
-    expect(currentId(next.game!)).toBe("p1");
+    expect(seatsDeclared(declareForCpus(once, createRng(1), NOW))).toEqual([1, 2]);
   });
 
-  it("CPU が得点を積む", () => {
-    const room = startedRoom([false, true, true]);
-    const afterHuman = { ...room, game: { ...room.game!, currentPlayerIndex: 1 } };
-
-    const next = playCpuTurns(afterHuman, createRng(1), NOW);
-
-    // 横穴を踏まなければ得点が入る。2人ぶん回すのでどちらかは入る
-    expect(next.game!.players.slice(1).some((p) => p.points > 0)).toBe(true);
-  });
-
-  it("CPU の手札が減る", () => {
-    const room = startedRoom([false, true, true]);
-    const afterHuman = { ...room, game: { ...room.game!, currentPlayerIndex: 1 } };
-
-    const next = playCpuTurns(afterHuman, createRng(1), NOW);
-
-    expect(next.game!.players[1]!.hand.length).toBeLessThan(room.game!.players[1]!.hand.length);
-  });
-
-  it("全員 CPU ならゲームが終わるまで進む", () => {
-    const room = startedRoom([true, true, true]);
-
-    const next = playCpuTurns(room, createRng(1), NOW);
-
-    expect(next.game?.phase).toBe("finished");
-    expect(next.game?.round).toBeGreaterThan(DEFAULT_BALANCE.maxRounds);
-  });
-
-  it("全員 CPU でも勝者が決まる得点になる", () => {
-    const next = playCpuTurns(startedRoom([true, true, true, true]), createRng(2), NOW);
-
-    expect(next.game!.players.some((p) => p.points > 0)).toBe(true);
-  });
-
-  it("ゲームが始まっていなければそのまま返す", () => {
-    const lobby = joinRoom(createRoom("ABCDEF", NOW), { name: "A", token: "t1", isCpu: true }, NOW);
-
-    expect(playCpuTurns(lobby, createRng(1), NOW)).toEqual(lobby);
-  });
-
-  it("ゲームが終わっていればそのまま返す", () => {
-    const room = startedRoom([true, true, true]);
-    const finished = { ...room, game: { ...room.game!, phase: "finished" as const } };
-
-    expect(playCpuTurns(finished, createRng(1), NOW)).toEqual(finished);
-  });
-
-  it("更新時刻を進める", () => {
-    const room = startedRoom([true, true, true]);
-
-    expect(playCpuTurns(room, createRng(1), NOW + 9).updatedAt).toBe(NOW + 9);
-  });
-
-  it("元のルームを変更しない", () => {
-    const room = startedRoom([true, true, true]);
-    const before = room.game!.players[0]!.hand.length;
-
-    playCpuTurns(room, createRng(1), NOW);
-
-    expect(room.game!.players[0]!.hand).toHaveLength(before);
-  });
-
-  it("投入できる札がない CPU の手番は、何も投入せずに次へ回る", () => {
+  it("投入できる札がなければ降りると宣言する（docs/spec.md §3）", () => {
     const room = startedRoom([false, true, true]);
     const game = room.game;
-    if (game === null) throw new Error("ゲームが開始していない");
-
-    // 2人目の CPU の手札を空にする
+    if (game === null) throw new Error("開始しているはず");
     const empty: Room = {
       ...room,
-      game: {
-        ...game,
-        currentPlayerIndex: 1,
-        players: game.players.map((p, i) => (i === 1 ? { ...p, hand: [] } : p)),
-      },
+      game: { ...game, players: game.players.map((p, i) => (i === 1 ? { ...p, hand: [] } : p)) },
     };
 
-    const next = playCpuTurns(empty, createRng(1), NOW);
+    const next = declareForCpus(empty, createRng(1), NOW);
 
-    // p2 は何も打たずに手番を終え、p3（CPU）も打ったあと人間へ戻る。
-    // ラウンド終了のドローで得点が入ることはあるので、得点は見ない
-    expect(currentId(next.game as GameState)).toBe("p1");
+    expect(next.tick?.declarations.find((d) => d.playerIndex === 1)?.declaration).toEqual({
+      kind: "withdraw",
+    });
+  });
+
+  it("そのラウンドから降りた CPU には宣言させない", () => {
+    const room = startedRoom([false, true, true]);
+    const tick = room.tick;
+    if (tick === null) throw new Error("開始しているはず");
+
+    const next = declareForCpus({ ...room, tick: { ...tick, active: [0, 1] } }, createRng(1), NOW);
+
+    expect(seatsDeclared(next)).toEqual([1]);
+  });
+
+  it("宣言の拍でなければ何もしない", () => {
+    const room = startedRoom([false, true, true]);
+    const tick = room.tick;
+    if (tick === null) throw new Error("開始しているはず");
+    const revealing: Room = { ...room, tick: { ...tick, phase: "revealing" } };
+
+    expect(declareForCpus(revealing, createRng(1), NOW)).toBe(revealing);
+  });
+
+  it("ロビーでは何もしない", () => {
+    const lobby = createRoom("ABCDEF", NOW);
+
+    expect(declareForCpus(lobby, createRng(1), NOW)).toBe(lobby);
   });
 });

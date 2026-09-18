@@ -22,6 +22,7 @@ const room = (rev: number): RoomView => ({
   phase: "lobby",
   players: [],
   game: null,
+  tick: null,
 });
 
 describe("reconnectDelayMs", () => {

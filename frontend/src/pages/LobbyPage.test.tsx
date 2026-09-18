@@ -6,12 +6,12 @@ import { renderWithRouter } from "@/test-utils/render";
 import { App } from "@/App";
 import { LobbyPage } from "./LobbyPage";
 import type { RoomView } from "@/lib/types";
-import { buildGame } from "@/test-utils/game";
+import { buildGame, buildTick } from "@/test-utils/game";
 
 const CODE = "ABCDEF";
 
 function lobby(players: RoomView["players"]): RoomView {
-  return { code: CODE, rev: 1, phase: "lobby", players, game: null };
+  return { code: CODE, rev: 1, phase: "lobby", players, game: null, tick: null };
 }
 
 const あき = { id: "p1", name: "あき", isCpu: false };
@@ -172,7 +172,12 @@ describe("ロビー画面", () => {
 
   it("ゲームが始まっていれば対局画面になる", async () => {
     signIn();
-    mockFetch(() => ({ ...lobby([あき, はると, cpu]), phase: "playing", game: buildGame() }));
+    mockFetch(() => ({
+      ...lobby([あき, はると, cpu]),
+      phase: "playing",
+      game: buildGame(),
+      tick: buildTick(),
+    }));
 
     renderWithRouter(<App />, { route: `/rooms/${CODE}` });
 

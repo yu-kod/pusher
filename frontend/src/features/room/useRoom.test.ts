@@ -3,7 +3,14 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { useRoom } from "./useRoom";
 import type { RoomView } from "@/lib/types";
 
-const room: RoomView = { code: "ABCDEF", rev: 1, phase: "lobby", players: [], game: null };
+const room: RoomView = {
+  code: "ABCDEF",
+  rev: 1,
+  phase: "lobby",
+  players: [],
+  game: null,
+  tick: null,
+};
 
 afterEach(() => {
   vi.unstubAllGlobals();

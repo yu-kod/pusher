@@ -2,11 +2,11 @@ import type { PlayerView } from "@/lib/types";
 
 type Props = {
   players: readonly PlayerView[];
-  /** 解決する順に並んだプレイヤー id。サーバーが決める */
-  order: readonly string[];
-  /** いま盤面が動いている人。解決の拍以外は null */
-  movingId: string | null;
-  meId: string;
+  /** 解決する順に並んだ席の添字。サーバーが決める */
+  order: readonly number[];
+  /** いま盤面が動いている席。解決の拍以外は null */
+  movingIndex: number | null;
+  meIndex: number;
 };
 
 /**
@@ -19,26 +19,27 @@ type Props = {
  * 「あと1枚のレーンに自分より先に手が届くのは誰か」が読めないと、
  * 早く降りることの値段が分からない。
  */
-export function PriorityRow({ players, order, movingId, meId }: Props) {
-  const seats = order
-    .map((id) => players.find((player) => player.id === id))
-    .filter((player): player is PlayerView => player !== undefined);
+export function PriorityRow({ players, order, movingIndex, meIndex }: Props) {
+  const seats = order.flatMap((index) => {
+    const player = players[index];
+    return player === undefined ? [] : [{ player, index }];
+  });
 
   return (
     <div
       aria-label="先行権の順"
       className="flex shrink-0 items-center justify-center gap-1 overflow-hidden bg-black/20 px-2 py-0.5"
     >
-      {seats.map((player, rank) => (
+      {seats.map(({ player, index }, rank) => (
         <span
           key={player.id}
           data-testid="priority-seat"
-          data-me={player.id === meId}
-          data-moving={player.id === movingId}
+          data-me={index === meIndex}
+          data-moving={index === movingIndex}
           className={`flex min-w-0 items-center gap-1 rounded px-1.5 py-0.5 text-[11px] whitespace-nowrap transition ${
-            player.id === movingId
+            index === movingIndex
               ? "bg-amber-300 font-bold text-amber-950"
-              : player.id === meId
+              : index === meIndex
                 ? "bg-white/15 text-emerald-50"
                 : "text-emerald-50/60"
           }`}

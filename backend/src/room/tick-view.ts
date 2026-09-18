@@ -22,7 +22,6 @@
  * サーバー側で引き直すと「卓にいない席」という起こりえない分岐を抱えることになり、
  * その分岐は一生テストできない。
  */
-import type { Card } from "../game/deck.js";
 import type { GameState, PlayerId } from "../game/setup.js";
 import type { RollOutcome } from "../game/turn.js";
 import type { Declaration, TickPhase, TickSession } from "./tick-session.js";
@@ -40,14 +39,19 @@ export type TickPlayerView = {
   declaration: DeclarationView | null;
 };
 
-/** 解決したレーン1本ぶん。落ちたカードは落下口で表になるので公開してよい */
+/**
+ * 解決したレーン1本ぶん。
+ *
+ * **落ちたカードそのものは返さない。** 何が落ちたかは、滞留とレーンの中身を
+ * 推測する材料になる（`docs/spec.md` §8）。枚数と点数だけを返す。
+ */
 export type StepLaneView = {
   laneIndex: number;
   insertedCoins: number;
   target: number;
   roll: number;
   outcome: RollOutcome;
-  fallen: Card[];
+  droppedCount: number;
 };
 
 /** 解決のステップ1つ。クライアントはこの列を先頭から順に再生する（§8-5） */
@@ -102,7 +106,7 @@ export function tickViewFor(game: GameState, session: TickSession, viewerId: Pla
         target: lane.target,
         roll: lane.roll,
         outcome: lane.outcome,
-        fallen: lane.fallenCards,
+        droppedCount: lane.fallenCards.length,
       })),
       gainedPoints: step.gainedPoints,
       busted: step.busted,
