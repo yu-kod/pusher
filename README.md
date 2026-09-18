@@ -5,7 +5,7 @@
 ブラウザでオンライン対戦できる Web アプリとして実装する。
 
 ゲームのルールは [docs/spec.md](docs/spec.md) を参照。
-オンライン対戦としての進行方式の提案は [docs/online-design.md](docs/online-design.md) にある。
+進行方式（同時進行・ボール札・先行権）の提案は [docs/turn-structure.md](docs/turn-structure.md) にある。
 
 ## 技術スタック
 
