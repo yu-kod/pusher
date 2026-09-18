@@ -55,10 +55,11 @@ export function createRealtimeHub(deps: RealtimeHubDeps): RealtimeHub {
     deps.send(connectionId, { t: "room", room: roomBody(room, playerId ?? SPECTATOR) });
 
   const greet = async (connectionId: string, code: RoomCode, token: string | undefined) => {
-    const room = await deps.store.get(code);
-    if (room === null) {
+    const stored = await deps.store.get(code);
+    if (stored === null) {
       return fail(connectionId, "ROOM_NOT_FOUND", `そのルームはない: ${code}`);
     }
+    const { room } = stored;
 
     // トークンを出さなければ観戦者。出したなら、このルームのものでなければ拒む
     let playerId: string | null = null;

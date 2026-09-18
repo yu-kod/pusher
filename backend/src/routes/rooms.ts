@@ -35,10 +35,11 @@ import {
   startGame,
   type Room,
 } from "../room/room.js";
-import type { RoomStore } from "../room/store.js";
+import { RoomConflictError, type RoomStore, type StoredRoom } from "../room/store.js";
 import {
   forbidden,
   messageOf,
+  roomConflict,
   roomNotFound,
   unauthorized,
   unprocessable,
@@ -129,23 +130,36 @@ export function createRoomsRoute(deps: RoomsDeps) {
 
   const app = new Hono();
 
+  /** ルームを版つきで読む。書き込みはこの版を条件にする */
+  const load = async (code: string): Promise<StoredRoom> => {
+    const stored = await deps.store.get(code);
+    if (stored === null) {
+      throw roomNotFound(code);
+    }
+    return stored;
+  };
+
   /**
    * 保存して、繋いでいる全員へ知らせる。
    *
+   * 書き込みは読んだときの版を条件にする（#78）。先に別の更新が入っていたら 409 を返し、
+   * クライアントに状態を取り直させる。手番制のいま同時に届くのはロビーへの参加くらいなので、
+   * サーバー側ではやり直さない（同時投入を入れる #80 で読み直して解決し直す形にする）。
+   *
    * 配信に失敗してもアクションは成功のまま返す。取りこぼしはポーリングが拾うので、
    * 通知が届かなかったことを理由に手番を巻き戻すほうがはるかに悪い。
+   * 書き込めなかったときは配信しない（配る新しい状態が無い）。
    */
-  const persist = async (room: Room): Promise<void> => {
-    await deps.store.save(room);
-    await deps.publish?.(room).catch(() => undefined);
-  };
-
-  const load = async (code: string): Promise<Room> => {
-    const room = await deps.store.get(code);
-    if (room === null) {
-      throw roomNotFound(code);
+  const persist = async (room: Room, write: Promise<void>): Promise<void> => {
+    try {
+      await write;
+    } catch (error) {
+      if (error instanceof RoomConflictError) {
+        throw roomConflict(error.message);
+      }
+      throw error;
     }
-    return room;
+    await deps.publish?.(room).catch(() => undefined);
   };
 
   /** 提示されたトークンがこのルームのものか確かめ、プレイヤーを返す */
@@ -176,7 +190,7 @@ export function createRoomsRoute(deps: RoomsDeps) {
     const code = generateRoomCode(rngFor());
     const token = crypto.randomUUID();
     const room = joinRoom(createRoom(code, now()), { name, token, isCpu: isCpu ?? false }, now());
-    await persist(room);
+    await persist(room, deps.store.create(room));
 
     return c.json({ code, playerId: "p1", token }, 201);
   });
@@ -185,13 +199,13 @@ export function createRoomsRoute(deps: RoomsDeps) {
   app.post("/:code/players", async (c) => {
     const code = c.req.param("code");
     const { name, isCpu } = await parseJoin(await c.req.json().catch(() => null));
-    const room = await load(code);
+    const { room, rev } = await load(code);
 
     const token = crypto.randomUUID();
     const joined = asUnprocessable(() =>
       joinRoom(room, { name, token, isCpu: isCpu ?? false }, now())
     );
-    await persist(joined);
+    await persist(joined, deps.store.update(joined, rev));
 
     const player = joined.players[joined.players.length - 1];
     return c.json({ playerId: player?.id, token }, 201);
@@ -199,24 +213,24 @@ export function createRoomsRoute(deps: RoomsDeps) {
 
   // CPU の削除（ロビーのみ）
   app.delete("/:code/players/:id", async (c) => {
-    const room = await load(c.req.param("code"));
+    const { room, rev } = await load(c.req.param("code"));
     const player = authenticate(room, c.req.header("Authorization"));
 
     const removed = asUnprocessable(() => removeCpu(room, c.req.param("id"), now()));
-    await persist(removed);
+    await persist(removed, deps.store.update(removed, rev));
 
     return c.json(roomBody(removed, player.id));
   });
 
   // 開始
   app.post("/:code/start", async (c) => {
-    const room = await load(c.req.param("code"));
+    const { room, rev } = await load(c.req.param("code"));
     const player = authenticate(room, c.req.header("Authorization"));
 
     const started = asUnprocessable(() => startGame(room, rngFor(), config, now()));
     // 先頭が CPU なら、人間の手番になるまで自動で進める（#16）
     const advanced = playCpuTurns(started, rngFor(), now());
-    await persist(advanced);
+    await persist(advanced, deps.store.update(advanced, rev));
 
     return c.json(roomBody(advanced, player.id));
   });
@@ -245,7 +259,7 @@ export function createRoomsRoute(deps: RoomsDeps) {
 
   // 投入。続けられなくなったら、その場で手番を終えて次へ回す
   app.post("/:code/turns/insert", async (c) => {
-    const room = await load(c.req.param("code"));
+    const { room, rev } = await load(c.req.param("code"));
     const { player, game } = requireTurn(room, c.req.header("Authorization"));
 
     const parsed = insertSchema.safeParse(await c.req.json().catch(() => null));
@@ -265,14 +279,14 @@ export function createRoomsRoute(deps: RoomsDeps) {
 
     const next = result.canContinue ? result.state : finishTurn(result.state, rng);
     const saved = playCpuTurns({ ...room, game: next, updatedAt: now() }, rngFor(), now());
-    await persist(saved);
+    await persist(saved, deps.store.update(saved, rev));
 
     return c.json({ ...roomBody(saved, player.id), result: insertResultBody(result) });
   });
 
   // やめる。未確定得点を確定して手番を終える（§3）
   app.post("/:code/turns/stop", async (c) => {
-    const room = await load(c.req.param("code"));
+    const { room, rev } = await load(c.req.param("code"));
     const { player, game } = requireTurn(room, c.req.header("Authorization"));
 
     // パスはできない。投入できる札がない場合だけ、投入せずに終えられる
@@ -283,14 +297,14 @@ export function createRoomsRoute(deps: RoomsDeps) {
 
     const ended: Room = { ...room, game: finishTurn(game, rngFor()), updatedAt: now() };
     const saved = playCpuTurns(ended, rngFor(), now());
-    await persist(saved);
+    await persist(saved, deps.store.update(saved, rev));
 
     return c.json(roomBody(saved, player.id));
   });
 
   // 状態取得。トークンを渡さなければ観戦者として扱う
   app.get("/:code", async (c) => {
-    const room = await load(c.req.param("code"));
+    const { room } = await load(c.req.param("code"));
     const token = tokenOf(c.req.header("Authorization"));
     const viewer = room.players.find((p) => p.token === token);
 

@@ -25,7 +25,7 @@ backend/    — Hono API + WebSocket ハンドラ（Lambda デプロイ）
   src/game/ — ゲームエンジン（純粋関数。I/O を持たない）
 infra/      — Terraform
   bootstrap/ — tfstate バケットと GitHub Actions 用 OIDC ロール（初回のみ手動 apply）
-docs/       — 仕様書・デプロイ手順
+docs/       — 仕様書・保存先/通信の設計・デプロイ手順
 ```
 
 ## 開発

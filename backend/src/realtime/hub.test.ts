@@ -25,7 +25,7 @@ function playing(): Room {
 async function setup(room: Room | null = lobby()) {
   const store: RoomStore = createInMemoryRoomStore();
   if (room !== null) {
-    await store.save(room);
+    await store.create(room);
   }
   const registry = createInMemoryConnectionRegistry();
   const send = vi.fn<Send>(() => Promise.resolve());
