@@ -311,3 +311,53 @@ describe("ティック同時進行（docs/turn-structure.md §4-1）", () => {
     expect(summary.sameLaneRate).toBe(0);
   });
 });
+
+describe("先行権（docs/turn-structure.md §4-2 / #98）", () => {
+  const priority = withPreset("tickPriority");
+
+  it("先行権つきでも完走する", () => {
+    const stats = simulateGame(priority, expectedValueStrategy(), createRng(1), PLAYERS);
+
+    expect(stats.finished).toBe(true);
+  });
+
+  it("3人でも回る", () => {
+    expect(simulateGame(priority, randomStrategy(), createRng(5), 3).finished).toBe(true);
+  });
+
+  it("全員がラウンドごとにちょうど1回だけ降りる（先行権の材料が揃う）", () => {
+    const stats = simulateGame(priority, expectedValueStrategy(), createRng(4), PLAYERS);
+
+    expect(stats.voluntaryStops + stats.forcedStops).toBe(stats.turns);
+    expect(stats.turns).toBe(stats.rounds * PLAYERS);
+  });
+
+  it("解決順が変わるので、席順のままの同時進行とは違う結果になる", () => {
+    const withPriority = simulateGame(priority, expectedValueStrategy(), createRng(3), PLAYERS);
+    const bySeat = simulateGame(
+      withPreset("tickMode"),
+      expectedValueStrategy(),
+      createRng(3),
+      PLAYERS
+    );
+
+    expect(withPriority.finalPoints).not.toEqual(bySeat.finalPoints);
+  });
+
+  it("手札が尽きるほうへ寄せても完走する", () => {
+    const stats = simulateGame(
+      withPreset("tickPriority", "noRoundDraw"),
+      expectedValueStrategy(),
+      createRng(1),
+      PLAYERS
+    );
+
+    expect(stats.finished).toBe(true);
+  });
+
+  it("同じシードなら同じ結果になる（再現性）", () => {
+    const run = () => simulateGame(priority, expectedValueStrategy(), createRng(42), PLAYERS);
+
+    expect(run()).toEqual(run());
+  });
+});
