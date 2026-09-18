@@ -11,6 +11,13 @@ type Props = {
   /** この席が手番か */
   current: boolean;
   isMe: boolean;
+  /**
+   * 宣言を済ませたか。宣言の拍でないときは `null`。
+   *
+   * 出せるのはこの真偽値までで、**何を宣言したかは席に出さない**
+   * （docs/realtime.md §8-3）。降りたことも同じ扱いで伏せる。
+   */
+  declared: boolean | null;
 };
 
 /**
@@ -19,7 +26,7 @@ type Props = {
  * 手札は裏向きの束と枚数だけで、**中身は一切持たない**（`docs/spec.md` §8）。
  * 枚数だけが公開情報なので、それ以上は画面にも渡さない。
  */
-export function Seat({ name, points, handCount, position, current, isMe }: Props) {
+export function Seat({ name, points, handCount, position, current, isMe, declared }: Props) {
   const backs = Math.min(handCount, MAX_BACKS);
   const sideways = position === "left" || position === "right";
 
@@ -29,6 +36,7 @@ export function Seat({ name, points, handCount, position, current, isMe }: Props
       aria-label={`${name}の席`}
       data-position={position}
       data-current={current}
+      data-declared={declared === null ? undefined : declared}
       className={`flex items-center gap-2 rounded-xl border px-2.5 py-1.5 backdrop-blur-[1px] transition ${
         current
           ? "border-amber-300 bg-amber-300/15 shadow-[0_0_0_2px_rgba(252,211,77,0.35)]"
@@ -65,6 +73,16 @@ export function Seat({ name, points, handCount, position, current, isMe }: Props
       {current && (
         <span className="rounded bg-amber-300 px-1.5 py-0.5 text-[10px] font-bold text-amber-950">
           手番
+        </span>
+      )}
+
+      {declared !== null && (
+        <span
+          className={`rounded px-1.5 py-0.5 text-[10px] font-bold whitespace-nowrap ${
+            declared ? "bg-emerald-400 text-emerald-950" : "bg-white/15 text-emerald-50/70"
+          }`}
+        >
+          {declared ? "宣言済み" : "考え中"}
         </span>
       )}
     </div>

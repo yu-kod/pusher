@@ -1,14 +1,28 @@
-import { useState } from "react";
-import { insertCard, stopTurn, type InsertResult } from "@/lib/api";
+import { useEffect, useRef, useState } from "react";
+import {
+  declareInsert,
+  declareWithdraw,
+  insertCard,
+  resolveTick,
+  retractDeclaration,
+  stopTurn,
+  type InsertResult,
+} from "@/lib/api";
 import { messageOf } from "@/lib/errors";
 import { ErrorMessage } from "@/components/ErrorMessage";
 import { Lane } from "./components/Lane";
 import { HandCard } from "./components/HandCard";
 import { Die } from "./components/Die";
 import { Seat } from "./components/Seat";
+import { TickBanner } from "./components/TickBanner";
+import { RevealPanel } from "./components/RevealPanel";
+import { ResolutionPanel } from "./components/ResolutionPanel";
+import { DeclarationActions } from "./components/DeclarationActions";
+import { secondsLeft, stepAt } from "./tick";
+import { useNow } from "./useNow";
 import { assignSeats, type Seat as SeatData, type SeatPosition } from "./seating";
 import { sideHoleHint } from "@/lib/rules";
-import type { Card, Credentials, GameView, PlayerView } from "@/lib/types";
+import type { Card, Credentials, GameView, PlayerView, TickPhase } from "@/lib/types";
 
 type Props = {
   code: string;
@@ -55,6 +69,32 @@ export function GameBoard({ code, game, credentials, reload }: Props) {
   const myHand = me?.hand.owner === true ? me.hand.cards : [];
   const isMyTurn = game.players[game.currentPlayerIndex]?.id === credentials.playerId;
   const finished = game.phase === "finished";
+
+  // --- 3拍の進行（docs/realtime.md §8）。サーバーがまだ持っていなければ手番制のまま ---
+  const tick = game.tick;
+  const phase = tick?.phase;
+  const inTick = tick !== undefined;
+  // 表示のための時計。締め切りの判定そのものはサーバーが持つ（§8-2）
+  const now = useNow(inTick);
+
+  /** 解決を先頭から1歩ずつ再生する。全員ぶん届いていても、動かすのは1人ずつ（§8-5） */
+  const playing =
+    tick?.phase === "resolving"
+      ? tick.steps[stepAt(tick.steps, now - (tick.resolvedAt ?? now))]
+      : undefined;
+
+  /** 自分の宣言。他人のぶんは公開の拍まで null で届く（§8-3） */
+  const myDeclaration = me?.declaration ?? null;
+  const declaredCount = game.players.filter((p) => p.declared === true).length;
+
+  /** いま盤面が動いている人。宣言と公開の拍では誰も動かない */
+  const movingId = inTick
+    ? (playing?.playerId ?? null)
+    : (game.players[game.currentPlayerIndex]?.id ?? null);
+
+  /** レーンと手札を選べるか。宣言を済ませたら締め切りまで触らせない */
+  const canChoose = inTick ? phase === "declaring" && myDeclaration === null : isMyTurn;
+  const choosingDisabled = !canChoose || finished || busy;
 
   const seats = assignSeats(game.players, myIndex < 0 ? 0 : myIndex);
   // 手前の席は自分専用で、操作と一緒に画面の下に出す。観戦者は席を持たないので、
@@ -120,6 +160,38 @@ export function GameBoard({ code, game, credentials, reload }: Props) {
     });
   };
 
+  const onDeclare = (
+    tickIndex: number,
+    { handIndex, laneIndex }: NonNullable<typeof selection>
+  ) => {
+    run(async () => {
+      await declareInsert(
+        code,
+        credentials.token,
+        tickIndex,
+        laneIndex,
+        handIndex,
+        crypto.randomUUID()
+      );
+      setSelected(null);
+      setSelectedLane(null);
+    });
+  };
+
+  const onWithdraw = (tickIndex: number) => {
+    run(async () => {
+      await declareWithdraw(code, credentials.token, tickIndex, crypto.randomUUID());
+      setSelected(null);
+      setSelectedLane(null);
+    });
+  };
+
+  const onRetract = (tickIndex: number) => {
+    run(async () => {
+      await retractDeclaration(code, credentials.token, tickIndex);
+    });
+  };
+
   const onStop = () => {
     run(async () => {
       await stopTurn(code, credentials.token);
@@ -130,25 +202,68 @@ export function GameBoard({ code, game, credentials, reload }: Props) {
 
   const canInsert = isMyTurn && !finished && selection !== null;
 
+  /**
+   * 締め切りを過ぎても誰も動かないときに、進行を1回だけ促す（docs/realtime.md §8-2）。
+   *
+   * Lambda には常駐プロセスが無く、締め切りは「時刻」として状態に置かれている。
+   * 通りかかったリクエストが解決する作りなので、誰も操作していない卓が止まらない
+   * ように、クライアントが1回だけ肩を叩く。解決は冪等なので、全員が投げても1回しか進まない。
+   */
+  const nudgedTick = useRef<number | null>(null);
+  const tickIndex = tick?.index;
+  const deadlineAt = tick?.deadlineAt;
+  useEffect(() => {
+    if (phase !== "declaring" || tickIndex === undefined || deadlineAt === undefined) {
+      return;
+    }
+    if (now < deadlineAt || nudgedTick.current === tickIndex) {
+      return;
+    }
+    nudgedTick.current = tickIndex;
+    void (async () => {
+      try {
+        await resolveTick(code, credentials.token, tickIndex);
+        await reload();
+      } catch {
+        // 肩を叩くだけなので、失敗しても画面には出さない。締め切りは過ぎたままなので、
+        // 次に誰かが動けばそこで解決される
+      }
+    })();
+  }, [phase, tickIndex, deadlineAt, now, code, credentials.token, reload]);
+
   return (
     <main className="table-felt fixed inset-0 flex flex-col overflow-hidden text-emerald-50">
-      <Header game={game} />
+      <Header game={game} showTurn={!inTick} />
+
+      {tick !== undefined && (
+        <TickBanner
+          phase={tick.phase}
+          secondsLeft={secondsLeft(tick.deadlineAt, now)}
+          declaredCount={declaredCount}
+          playerCount={game.players.length}
+          resolving={
+            playing === undefined
+              ? null
+              : (game.players.find((p) => p.id === playing.playerId)?.name ?? null)
+          }
+        />
+      )}
 
       {/* 卓。自分は手前、他のプレイヤーは周り、台は真ん中 */}
       <div className="relative min-h-0 flex-1">
         <div className="absolute inset-x-0 top-1 flex justify-center gap-2">
           {seatsAt("top").map((seat) => (
-            <SeatOf key={seat.player.id} seat={seat} game={game} />
+            <SeatOf key={seat.player.id} seat={seat} movingId={movingId} phase={phase} />
           ))}
         </div>
         <div className="absolute top-1/2 left-1 flex -translate-y-1/2 flex-col gap-2">
           {seatsAt("left").map((seat) => (
-            <SeatOf key={seat.player.id} seat={seat} game={game} />
+            <SeatOf key={seat.player.id} seat={seat} movingId={movingId} phase={phase} />
           ))}
         </div>
         <div className="absolute top-1/2 right-1 flex -translate-y-1/2 flex-col gap-2">
           {seatsAt("right").map((seat) => (
-            <SeatOf key={seat.player.id} seat={seat} game={game} />
+            <SeatOf key={seat.player.id} seat={seat} movingId={movingId} phase={phase} />
           ))}
         </div>
 
@@ -170,7 +285,7 @@ export function GameBoard({ code, game, credentials, reload }: Props) {
                 target={targetFor(index)}
                 risky={riskyFor(targetFor(index))}
                 selected={selectedLane === index}
-                disabled={!isMyTurn || finished || busy}
+                disabled={choosingDisabled}
                 onSelect={() => setSelectedLane(index)}
                 flight={
                   flight !== null && flight.laneIndex === index && result !== null
@@ -186,7 +301,14 @@ export function GameBoard({ code, game, credentials, reload }: Props) {
           </p>
         </div>
 
-        {result !== null && <ResultPanel key={resultSeq} result={result} />}
+        {phase === "revealing" && <RevealPanel players={game.players} />}
+        {playing !== undefined && (
+          <ResolutionPanel
+            step={playing}
+            name={game.players.find((p) => p.id === playing.playerId)?.name ?? ""}
+          />
+        )}
+        {!inTick && result !== null && <ResultPanel key={resultSeq} result={result} />}
         {finished && <Result game={game} />}
       </div>
 
@@ -197,7 +319,7 @@ export function GameBoard({ code, game, credentials, reload }: Props) {
         <Hand
           cards={myHand}
           selectedIndex={selected?.handIndex ?? null}
-          disabled={!isMyTurn || finished || busy}
+          disabled={choosingDisabled}
           onSelect={(handIndex, card) => setSelected({ handIndex, card })}
         />
 
@@ -208,8 +330,9 @@ export function GameBoard({ code, game, credentials, reload }: Props) {
               points={me.points}
               handCount={myHand.length}
               position="bottom"
-              current={isMyTurn}
+              current={movingId === me.id}
               isMe
+              declared={phase === "declaring" ? (me.declared ?? false) : null}
             />
           ) : (
             <span className="rounded-xl border border-white/10 bg-black/35 px-3 py-2 text-[13px] text-emerald-50/60">
@@ -220,7 +343,24 @@ export function GameBoard({ code, game, credentials, reload }: Props) {
           {!finished && <PendingPoints points={game.pendingPoints} />}
         </div>
 
-        {!finished && (
+        {!finished && tick !== undefined && tick.phase === "declaring" && (
+          <DeclarationActions
+            declared={myDeclaration}
+            canDeclare={selection !== null}
+            busy={busy}
+            onDeclare={selection === null ? undefined : () => onDeclare(tick.index, selection)}
+            onWithdraw={() => onWithdraw(tick.index)}
+            onCancel={() => onRetract(tick.index)}
+          />
+        )}
+
+        {!finished && inTick && phase !== "declaring" && (
+          <p className="mt-2 py-2 text-center text-[13px] text-emerald-50/60">
+            {phase === "revealing" ? "全員の狙いが開きました" : "先行権の順に解決しています"}
+          </p>
+        )}
+
+        {!finished && !inTick && (
           <TurnActions
             isMyTurn={isMyTurn}
             busy={busy}
@@ -235,7 +375,16 @@ export function GameBoard({ code, game, credentials, reload }: Props) {
   );
 }
 
-function SeatOf({ seat, game }: { seat: SeatData<PlayerView>; game: GameView }) {
+function SeatOf({
+  seat,
+  movingId,
+  phase,
+}: {
+  seat: SeatData<PlayerView>;
+  /** いま盤面が動いている人。誰も動いていなければ null */
+  movingId: string | null;
+  phase: TickPhase | undefined;
+}) {
   const { player } = seat;
   return (
     <Seat
@@ -243,13 +392,15 @@ function SeatOf({ seat, game }: { seat: SeatData<PlayerView>; game: GameView }) 
       points={player.points}
       handCount={player.hand.owner ? player.hand.cards.length : player.hand.count}
       position={seat.position}
-      current={seat.index === game.currentPlayerIndex}
+      current={movingId === player.id}
       isMe={false}
+      // 宣言の拍で出せるのは真偽値だけ。何を宣言したかは席に出さない（§8-3）
+      declared={phase === "declaring" ? (player.declared ?? false) : null}
     />
   );
 }
 
-function Header({ game }: { game: GameView }) {
+function Header({ game, showTurn }: { game: GameView; showTurn: boolean }) {
   const current = game.players[game.currentPlayerIndex];
 
   return (
@@ -257,9 +408,11 @@ function Header({ game }: { game: GameView }) {
       <p className="text-emerald-50/70">
         ラウンド {game.round} / {game.rules.maxRounds}
       </p>
-      <p>
-        手番 <span className="font-bold text-amber-200">{current?.name}</span>
-      </p>
+      {showTurn && (
+        <p>
+          手番 <span className="font-bold text-amber-200">{current?.name}</span>
+        </p>
+      )}
       <p className="text-emerald-50/70">
         JP {game.jackpotPoints}点
         <span className="ml-1 text-[11px]">

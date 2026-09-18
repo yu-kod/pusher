@@ -11,6 +11,7 @@ function renderSeat(props: Partial<React.ComponentProps<typeof Seat>> = {}) {
       position="top"
       current={false}
       isMe={false}
+      declared={null}
       {...props}
     />
   );
@@ -73,5 +74,33 @@ describe("Seat", () => {
     renderSeat({ handCount: 0 });
 
     expect(screen.queryByTestId("seat-card-back")).not.toBeInTheDocument();
+  });
+
+  it("宣言の拍では、宣言を済ませた席にそれと分かる印を出す", () => {
+    renderSeat({ declared: true });
+
+    expect(screen.getByText("宣言済み")).toBeInTheDocument();
+    expect(screen.getByTestId("seat")).toHaveAttribute("data-declared", "true");
+  });
+
+  it("まだ宣言していない席は、待っていると分かる", () => {
+    renderSeat({ declared: false });
+
+    expect(screen.getByText("考え中")).toBeInTheDocument();
+    expect(screen.getByTestId("seat")).toHaveAttribute("data-declared", "false");
+  });
+
+  it("宣言の拍でなければ、宣言の印は出さない", () => {
+    renderSeat({ declared: null });
+
+    expect(screen.queryByText("宣言済み")).not.toBeInTheDocument();
+    expect(screen.queryByText("考え中")).not.toBeInTheDocument();
+  });
+
+  it("宣言済みでも、何を宣言したかは席に出さない", () => {
+    const { container } = renderSeat({ declared: true });
+
+    // 席が持つのは真偽値だけ（docs/realtime.md §8-3）。投入先も、降りたことも伏せる
+    expect(container.textContent).not.toMatch(/レーン|降り/);
   });
 });
