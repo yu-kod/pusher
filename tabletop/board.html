@@ -1,0 +1,213 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <title>PUSHER TABLE 卓上版 台紙（レーン）</title>
+    <style>
+      @page {
+        size: A4;
+        margin: 0;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        font-family: "Hiragino Sans", "Noto Sans JP", "Yu Gothic", sans-serif;
+        color: #1b1b1b;
+        background: #efefef;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+      }
+      .sheet {
+        width: 210mm;
+        height: 297mm;
+        padding: 9mm 12mm 10mm;
+        margin: 0 auto 6mm;
+        background: #fff;
+      }
+      .sheet-head {
+        display: flex;
+        justify-content: space-between;
+        font-size: 3.4mm;
+        color: #666;
+        margin-bottom: 3mm;
+      }
+      .lanes {
+        display: grid;
+        grid-template-columns: repeat(3, 62mm);
+        gap: 0;
+      }
+      .lane {
+        border: 0.4mm solid #333;
+        border-right-width: 0;
+        display: flex;
+        flex-direction: column;
+      }
+      .lane:last-child {
+        border-right-width: 0.4mm;
+      }
+      .lane-name {
+        text-align: center;
+        font-size: 5mm;
+        font-weight: 700;
+        padding: 2mm 0;
+        color: #fff;
+      }
+      .lane-left .lane-name {
+        background: #2f6f4f;
+      }
+      .lane-center .lane-name {
+        background: #2472a4;
+      }
+      .lane-right .lane-name {
+        background: #a2542a;
+      }
+      .zone {
+        border-top: 0.3mm dashed #999;
+        padding: 2.5mm 3mm;
+        position: relative;
+      }
+      .zone h2 {
+        font-size: 3.6mm;
+        margin: 0 0 1.2mm;
+        letter-spacing: 0.3mm;
+      }
+      .zone p {
+        font-size: 2.9mm;
+        line-height: 1.45;
+        margin: 0;
+        color: #444;
+      }
+      .drop {
+        height: 38mm;
+        background: #f6f1e4;
+      }
+      .rail {
+        height: 94mm;
+        background: repeating-linear-gradient(
+          to bottom,
+          #fff,
+          #fff 11mm,
+          #f2f2f2 11mm,
+          #f2f2f2 11.4mm
+        );
+      }
+      .pending {
+        height: 66mm;
+        background: #f4f7fa;
+      }
+      .inlet {
+        height: 20mm;
+        background: #fff;
+      }
+      .arrow {
+        position: absolute;
+        right: 3mm;
+        bottom: 2.5mm;
+        font-size: 2.9mm;
+        color: #777;
+      }
+      .notes {
+        margin-top: 4mm;
+        font-size: 3.1mm;
+        line-height: 1.7;
+        color: #333;
+      }
+      .notes li {
+        margin-bottom: 0.8mm;
+      }
+      @media print {
+        body {
+          background: #fff;
+        }
+        .sheet {
+          margin: 0;
+          page-break-after: always;
+        }
+        .sheet:last-child {
+          page-break-after: auto;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <section class="sheet">
+      <div class="sheet-head">
+        <span>台紙 — 3本のレーン</span><span>PUSHER TABLE 卓上版</span>
+      </div>
+
+      <div class="lanes">
+        <div class="lane lane-left">
+          <div class="lane-name">左</div>
+          <div class="zone drop">
+            <h2>落下口</h2>
+            <p>押し出しで落ちたカードはここへ。点数を数えたら、コイン札は山札のいちばん下へ戻す。イベント札は捨て札へ。</p>
+          </div>
+          <div class="zone rail">
+            <h2>レーン</h2>
+            <p>裏向きのまま、重ねずに1列に並べる。ボール札だけ表向き。</p>
+            <span class="arrow">↑ 押し出しはこの向き</span>
+          </div>
+          <div class="zone pending">
+            <h2>滞留エリア</h2>
+            <p>投入したカードと、押し出しに失敗したカードが裏向きで溜まる。枚数は全員に公開。</p>
+          </div>
+          <div class="zone inlet">
+            <h2>投入口</h2>
+            <p>投入したカードは表向きで置き、判定が終わったら裏返す。</p>
+          </div>
+        </div>
+
+        <div class="lane lane-center">
+          <div class="lane-name">中央</div>
+          <div class="zone drop">
+            <h2>落下口</h2>
+            <p>押し出しで落ちたカードはここへ。点数を数えたら、コイン札は山札のいちばん下へ戻す。イベント札は捨て札へ。</p>
+          </div>
+          <div class="zone rail">
+            <h2>レーン</h2>
+            <p>裏向きのまま、重ねずに1列に並べる。ボール札だけ表向き。</p>
+            <span class="arrow">↑ 押し出しはこの向き</span>
+          </div>
+          <div class="zone pending">
+            <h2>滞留エリア</h2>
+            <p>投入したカードと、押し出しに失敗したカードが裏向きで溜まる。枚数は全員に公開。</p>
+          </div>
+          <div class="zone inlet">
+            <h2>投入口</h2>
+            <p>投入したカードは表向きで置き、判定が終わったら裏返す。</p>
+          </div>
+        </div>
+
+        <div class="lane lane-right">
+          <div class="lane-name">右</div>
+          <div class="zone drop">
+            <h2>落下口</h2>
+            <p>押し出しで落ちたカードはここへ。点数を数えたら、コイン札は山札のいちばん下へ戻す。イベント札は捨て札へ。</p>
+          </div>
+          <div class="zone rail">
+            <h2>レーン</h2>
+            <p>裏向きのまま、重ねずに1列に並べる。ボール札だけ表向き。</p>
+            <span class="arrow">↑ 押し出しはこの向き</span>
+          </div>
+          <div class="zone pending">
+            <h2>滞留エリア</h2>
+            <p>投入したカードと、押し出しに失敗したカードが裏向きで溜まる。枚数は全員に公開。</p>
+          </div>
+          <div class="zone inlet">
+            <h2>投入口</h2>
+            <p>投入したカードは表向きで置き、判定が終わったら裏返す。</p>
+          </div>
+        </div>
+      </div>
+
+      <ul class="notes">
+        <li><b>置き方</b> — 落下口を卓の中央（全員から遠い側）に、投入口を手前に向けて置く。カードは台紙からはみ出してよい。</li>
+        <li><b>レーンのカードは重ねない。</b> ボール札まであと何枚かが全員に見えている必要がある（これが取り合いの対象になる）。</li>
+        <li><b>滞留エリアも1列に。</b> 枚数がそのまま目標値になるので、いつでも数えられる並べ方にする。</li>
+        <li><b>裏向きのカードが透けないように</b>、厚紙に貼るか、不透明なスリーブに入れる。</li>
+      </ul>
+    </section>
+  </body>
+</html>

@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "sim": "tsx src/sim/main.ts",
+    "print": "tsx src/print/main.ts",
     "start": "node dist/index.js",
     "test": "vitest run --coverage",
     "test:watch": "vitest",
