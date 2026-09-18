@@ -21,9 +21,21 @@ import { withPreset } from "../game/balance.js";
  * 採用案 A''（プリセット `tickBallDeep`、#104）— ティック同時進行・先行権・ボール札に
  * **深いレーン**（12枚＋ボール札）を足した形。デッキは104枚になる。
  *
- * 既定値ではなくプリセットを見ているのは、この3点セットがまだ既定値に入っていないため。
- * `docs/spec.md` v0.3 で既定値が入れ替わったら、ここを `DEFAULT_BALANCE` に戻せば
- * 紙の側は何も変えずに追従できる。
+ * 既定値ではなくプリセットを見ているのは、`docs/spec.md` v0.3 のルールがエンジンに
+ * 入った一方で、**既定値はまだ v0.2 のまま**だから（spec v0.3 冒頭「実装の状態」）。
+ * サーバーが3拍を持って既定が切り替わったら、ここを `DEFAULT_BALANCE` に戻せばよい。
+ *
+ * ## カードを増やさない案（A'）に切り替えるとき
+ *
+ * デッキを90枚のままにする案（初期滞留を9枚 → 5枚に下げて同じ深さにする）を採る場合、
+ * ここを次に差し替えて `npm run print` を回せば刷り物はすべて追従する。
+ * ルールブックの「中身」「準備」「早見表」の枚数だけは手書きなので直す。
+ *
+ *     export const TABLETOP_BALANCE: Balance = {
+ *       ...withPreset("tickBallDeep"),
+ *       initialPendingCards: 5,
+ *       deck: DEFAULT_DECK_CONFIG,
+ *     };
  */
 export const TABLETOP_BALANCE = withPreset("tickBallDeep");
 
@@ -139,7 +151,7 @@ const EVENT_FACES: Record<EventKind, { name: string; body: string }> = {
   },
   extraSlot: {
     name: "投入口増設",
-    body: "1レーンを指定し、このカードを置く。以後そのレーンには誰でも2枚同時に投入できる（目標値は2枚のコイン合計＋滞留枚数）。引いた人はそのティックでもう1枚投入できる。",
+    body: "1レーンを指定し、このカードを置く。以後そのレーンには誰でも2枚同時に投入できる（目標値は2枚のコイン合計＋滞留枚数、押し込みもコインの合計から数える）。",
   },
   lottery: {
     name: "抽選抽選",
