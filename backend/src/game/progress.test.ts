@@ -7,6 +7,8 @@ import type { Card } from "./deck.js";
 import type { EventChooser } from "./resolve.js";
 import { determineWinners, endRound, endTurn } from "./progress.js";
 import { scriptedRng } from "../test-utils/rng.js";
+import { splitOverrides, withPendingPoints, type StateOverrides } from "../test-utils/state.js";
+import { pendingPointsOf } from "./push.js";
 
 /** レーン0・滞留の先頭を選ぶ chooser */
 const chooser: EventChooser = { chooseLane: () => 0, choosePending: () => 0 };
@@ -14,20 +16,23 @@ const chooser: EventChooser = { chooseLane: () => 0, choosePending: () => 0 };
 /** イベントを引かないテスト用。振られたら「出目を使い切った」で落ちる */
 const noRolls = scriptedRng([]);
 
-function buildState(overrides?: Partial<GameState>): GameState {
+function buildState(overrides?: StateOverrides): GameState {
+  const { pendingPoints, rest } = splitOverrides(overrides);
   const base = setupGame(["A", "B", "C"], createRng(1), DEFAULT_BALANCE);
-  return {
-    ...base,
-    players: base.players.map((p) => ({ ...p, hand: [], points: 0 })),
-    lanes: base.lanes.map((lane) => ({ ...lane, stock: [], pending: [] })),
-    drawPile: [],
-    discardPile: [],
-    pendingPoints: 0,
-    insertionRoundsThisTurn: 0,
-    jackpotPoints: 0,
-    jackpotCounter: 0,
-    ...overrides,
-  };
+  return withPendingPoints(
+    {
+      ...base,
+      players: base.players.map((p) => ({ ...p, hand: [], points: 0 })),
+      lanes: base.lanes.map((lane) => ({ ...lane, stock: [], pending: [] })),
+      drawPile: [],
+      discardPile: [],
+      insertionRoundsThisTurn: 0,
+      jackpotPoints: 0,
+      jackpotCounter: 0,
+      ...rest,
+    },
+    pendingPoints
+  );
 }
 
 describe("endTurn（手番の終了）", () => {
@@ -37,7 +42,7 @@ describe("endTurn（手番の終了）", () => {
     const result = endTurn(state);
 
     expect(result.state.players[0]?.points).toBe(7);
-    expect(result.state.pendingPoints).toBe(0);
+    expect(pendingPointsOf(result.state)).toBe(0);
   });
 
   it("次のプレイヤーへ手番を移す（docs/spec.md §3）", () => {
@@ -82,7 +87,7 @@ describe("endTurn（手番の終了）", () => {
 
     endTurn(state);
 
-    expect(state.pendingPoints).toBe(7);
+    expect(pendingPointsOf(state)).toBe(7);
     expect(state.currentPlayerIndex).toBe(0);
   });
 
@@ -458,7 +463,7 @@ describe("ラウンド終了時に引いたイベント（docs/spec.md §6）", 
     const result = endRound(state, { ...scriptedRng([]), ...noShuffle }, chooser);
 
     expect(result.state.players[1]?.points).toBe(3);
-    expect(result.state.pendingPoints).toBe(0);
+    expect(pendingPointsOf(result.state)).toBe(0);
   });
 
   it("「投入口増設」でも追加手番は発生しない（ルール解釈メモ）", () => {

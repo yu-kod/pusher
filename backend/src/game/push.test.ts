@@ -5,6 +5,8 @@ import { withPreset } from "./balance.js";
 import { setupGame, type GameState } from "./setup.js";
 import { coin, faceDown } from "../test-utils/cards.js";
 import { bankPendingPoints, collectFallenCards, resolvePush } from "./push.js";
+import { pendingPointsOf } from "./push.js";
+import { withPendingPoints } from "../test-utils/state.js";
 
 /**
  * レーン0 の中身と滞留、山札を指定した状態を作る。
@@ -238,7 +240,7 @@ describe("collectFallenCards", () => {
   it("落ちたコインカードの点数を未確定得点に加える（docs/spec.md §4-2）", () => {
     const state = buildState({});
 
-    expect(collectFallenCards(state, [coin(2), coin(3)]).pendingPoints).toBe(5);
+    expect(pendingPointsOf(collectFallenCards(state, [coin(2), coin(3)]))).toBe(5);
   });
 
   it("落ちたコインカードを山札の底へ戻す（docs/spec.md ルール解釈メモ）", () => {
@@ -257,15 +259,15 @@ describe("collectFallenCards", () => {
 
     const next = collectFallenCards(state, [coin(2), event]);
 
-    expect(next.pendingPoints).toBe(2);
+    expect(pendingPointsOf(next)).toBe(2);
     expect(next.drawPile).toEqual([coin(2)]);
     expect(next.discardPile).toEqual([event]);
   });
 
   it("既存の未確定得点に積み増す", () => {
-    const state = { ...buildState({}), pendingPoints: 4 };
+    const state = withPendingPoints(buildState({}), 4);
 
-    expect(collectFallenCards(state, [coin(3)]).pendingPoints).toBe(7);
+    expect(pendingPointsOf(collectFallenCards(state, [coin(3)]))).toBe(7);
   });
 
   it("手札は増えない（v0.2 で獲得は点数になった）", () => {
@@ -277,7 +279,7 @@ describe("collectFallenCards", () => {
   it("空配列を渡しても壊れない", () => {
     const state = buildState({});
 
-    expect(collectFallenCards(state, []).pendingPoints).toBe(0);
+    expect(pendingPointsOf(collectFallenCards(state, []))).toBe(0);
   });
 
   it("元の状態を変更しない", () => {
@@ -285,34 +287,33 @@ describe("collectFallenCards", () => {
 
     collectFallenCards(state, [coin(2)]);
 
-    expect(state.pendingPoints).toBe(0);
+    expect(pendingPointsOf(state)).toBe(0);
     expect(state.drawPile).toEqual([]);
   });
 });
 
 describe("bankPendingPoints", () => {
   it("未確定得点を手番プレイヤーの得点に加える（docs/spec.md §3）", () => {
-    const state = { ...buildState({}), pendingPoints: 7 };
+    const state = withPendingPoints(buildState({}), 7);
 
     const next = bankPendingPoints(state);
 
     expect(next.players[0]?.points).toBe(7);
-    expect(next.pendingPoints).toBe(0);
+    expect(pendingPointsOf(next)).toBe(0);
   });
 
   it("既存の得点に積み増す", () => {
     const base = buildState({});
     const state = {
       ...base,
-      pendingPoints: 4,
-      players: base.players.map((p, i) => (i === 0 ? { ...p, points: 10 } : p)),
+      players: base.players.map((p, i) => (i === 0 ? { ...p, points: 10, pendingPoints: 4 } : p)),
     };
 
     expect(bankPendingPoints(state).players[0]?.points).toBe(14);
   });
 
   it("手番プレイヤー以外の得点は変わらない", () => {
-    const state = { ...buildState({}), pendingPoints: 7 };
+    const state = withPendingPoints(buildState({}), 7);
 
     expect(bankPendingPoints(state).players[1]?.points).toBe(0);
   });
@@ -322,11 +323,11 @@ describe("bankPendingPoints", () => {
   });
 
   it("元の状態を変更しない", () => {
-    const state = { ...buildState({}), pendingPoints: 7 };
+    const state = withPendingPoints(buildState({}), 7);
 
     bankPendingPoints(state);
 
-    expect(state.pendingPoints).toBe(7);
+    expect(pendingPointsOf(state)).toBe(7);
     expect(state.players[0]?.points).toBe(0);
   });
 
@@ -342,5 +343,43 @@ describe("bankPendingPoints — 手番終了時のリセット", () => {
     const state = { ...buildState({}), pendingPoints: 4, insertionRoundsThisTurn: 3 };
 
     expect(bankPendingPoints(state).insertionRoundsThisTurn).toBe(0);
+  });
+});
+
+describe("未確定得点をプレイヤーごとに持つ（#88）", () => {
+  it("落下分は手番プレイヤーの未確定得点に積み上がり、他のプレイヤーには影響しない", () => {
+    const state = buildState({});
+
+    const next = collectFallenCards(state, [coin(3), coin(2)]);
+
+    expect(next.players[0]?.pendingPoints).toBe(5);
+    expect(next.players[1]?.pendingPoints).toBe(0);
+    expect(next.players[2]?.pendingPoints).toBe(0);
+  });
+
+  it("別々のプレイヤーが同時に未確定得点を抱えられる", () => {
+    const base = buildState({});
+
+    // A が3点を積んだあと、手番を B に移して B が2点を積む
+    const afterA = collectFallenCards(base, [coin(3)]);
+    const afterB = collectFallenCards({ ...afterA, currentPlayerIndex: 1 }, [coin(2)]);
+
+    expect(afterB.players[0]?.pendingPoints).toBe(3);
+    expect(afterB.players[1]?.pendingPoints).toBe(2);
+  });
+
+  it("確定させるのは手番プレイヤーのぶんだけで、他の人の未確定得点は残る", () => {
+    const base = buildState({});
+    const state = {
+      ...base,
+      players: base.players.map((p, i) => ({ ...p, pendingPoints: i === 0 ? 7 : 4 })),
+    };
+
+    const next = bankPendingPoints(state);
+
+    expect(next.players[0]?.points).toBe(7);
+    expect(next.players[0]?.pendingPoints).toBe(0);
+    expect(next.players[1]?.points).toBe(0);
+    expect(next.players[1]?.pendingPoints).toBe(4);
   });
 });

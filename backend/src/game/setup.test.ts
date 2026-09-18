@@ -75,8 +75,10 @@ describe("setupGame", () => {
       expect(setupGame(NAMES_4, createRng(1), buildConfig()).jackpotPoints).toBe(0);
     });
 
-    it("未確定得点は 0 で始まる（docs/spec.md §3）", () => {
-      expect(setupGame(NAMES_4, createRng(1), buildConfig()).pendingPoints).toBe(0);
+    it("全員の未確定得点が 0 で始まる（docs/spec.md §3）", () => {
+      const players = setupGame(NAMES_4, createRng(1), buildConfig()).players;
+
+      expect(players.map((p) => p.pendingPoints)).toEqual([0, 0, 0, 0]);
     });
 
     it("捨て札は空で始まる", () => {

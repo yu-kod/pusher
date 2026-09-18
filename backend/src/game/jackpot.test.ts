@@ -4,17 +4,22 @@ import { createRng } from "./rng.js";
 import { DEFAULT_BALANCE, withPreset } from "./balance.js";
 import { setupGame, type GameState } from "./setup.js";
 import { applySideHole, canRollJackpot, rollJackpot, settleJackpotAtGameEnd } from "./jackpot.js";
+import { splitOverrides, withPendingPoints, type StateOverrides } from "../test-utils/state.js";
+import { pendingPointsOf } from "./push.js";
 
-function buildState(overrides?: Partial<GameState>): GameState {
+function buildState(overrides?: StateOverrides): GameState {
+  const { pendingPoints, rest } = splitOverrides(overrides);
   const base = setupGame(["A", "B", "C"], createRng(1), DEFAULT_BALANCE);
-  return {
-    ...base,
-    players: base.players.map((p) => ({ ...p, hand: [], points: 0 })),
-    jackpotPoints: 0,
-    pendingPoints: 0,
-    jackpotCounter: 0,
-    ...overrides,
-  };
+  return withPendingPoints(
+    {
+      ...base,
+      players: base.players.map((p) => ({ ...p, hand: [], points: 0 })),
+      jackpotPoints: 0,
+      jackpotCounter: 0,
+      ...rest,
+    },
+    pendingPoints
+  );
 }
 
 describe("applySideHole", () => {
@@ -24,7 +29,7 @@ describe("applySideHole", () => {
     const next = applySideHole(state);
 
     expect(next.jackpotPoints).toBe(5);
-    expect(next.pendingPoints).toBe(0);
+    expect(pendingPointsOf(next)).toBe(0);
     expect(next.players[0]?.points).toBe(0);
   });
 
@@ -61,7 +66,7 @@ describe("applySideHole", () => {
     applySideHole(state);
 
     expect(state.jackpotCounter).toBe(1);
-    expect(state.pendingPoints).toBe(3);
+    expect(pendingPointsOf(state)).toBe(3);
     expect(state.jackpotPoints).toBe(0);
   });
 
@@ -165,7 +170,7 @@ describe("再判定の流れ（docs/spec.md §5）", () => {
     expect(first.won).toBe(false);
 
     // 2回目の横穴。カウンターは 5 で頭打ちのまま、再判定して当たる
-    state = applySideHole({ ...first.state, pendingPoints: 2 });
+    state = applySideHole(withPendingPoints(first.state, 2));
     expect(state.jackpotCounter).toBe(5);
     const second = rollJackpot(state, rng);
     expect(second.won).toBe(true);

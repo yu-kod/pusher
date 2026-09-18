@@ -3,11 +3,13 @@ import { coin, faceDown, faceUp } from "../test-utils/cards.js";
 import { DEFAULT_BALANCE } from "./balance.js";
 import { createRng } from "./rng.js";
 import { setupGame, type GameState } from "./setup.js";
+import { splitOverrides, withPendingPoints, type StateOverrides } from "../test-utils/state.js";
 import { viewFor } from "./view.js";
 
-function buildState(overrides?: Partial<GameState>): GameState {
+function buildState(overrides?: StateOverrides): GameState {
+  const { pendingPoints, rest } = splitOverrides(overrides);
   const base = setupGame(["A", "B", "C"], createRng(1), DEFAULT_BALANCE);
-  return { ...base, ...overrides };
+  return withPendingPoints({ ...base, ...rest }, pendingPoints);
 }
 
 /** ビューを JSON にして、カードのコイン数が現れるかを見る */
