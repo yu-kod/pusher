@@ -37,11 +37,11 @@ npm run print
 数字の出典は1か所にまとめてある。
 
 - 枚数・コインの比率・レーンの深さ・ラウンド数・JPの閾値・押し込み枚数
-  → `backend/src/game/balance.ts` のプリセット `tickBallDeep`（採用案 A″）。
+  → `backend/src/game/balance.ts` の `DEFAULT_BALANCE`（採用案 A″）。
   `backend/src/print/cards.ts` の `TABLETOP_BALANCE` がそれを見ている
 
 カードを増やさない案（A′：初期滞留を9枚 → 5枚に下げてデッキ90枚のまま）に切り替える場合も、
-`TABLETOP_BALANCE` の1か所を差し替えて `npm run print` を回すだけでよい（書き方は `cards.ts` のコメント）。
+`TABLETOP_BALANCE` をプリセット `deckA` に差し替えて `npm run print` を回すだけでよい。
 ルールブックの「中身」「準備」「早見表」の枚数は手書きなので、そこだけ直す。
 
 `board.html` と `rulebook.html` は手書きなので、ルールを変えたときは直接直す。

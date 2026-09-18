@@ -17,11 +17,11 @@ describe("buildDeckCards", () => {
   it("DEFAULT_DECK_CONFIG と同じ構成のカードを返す", () => {
     const cards = buildDeckCards(DEFAULT_DECK_CONFIG);
 
-    expect(cards).toHaveLength(90);
-    expect(cards.filter((c) => c.kind === "coin" && c.coins === 1)).toHaveLength(35);
-    expect(cards.filter((c) => c.kind === "coin" && c.coins === 2)).toHaveLength(30);
-    expect(cards.filter((c) => c.kind === "coin" && c.coins === 3)).toHaveLength(11);
-    expect(cards.filter((c) => c.kind === "event")).toHaveLength(14);
+    expect(cards).toHaveLength(104);
+    expect(cards.filter((c) => c.kind === "coin" && c.coins === 1)).toHaveLength(40);
+    expect(cards.filter((c) => c.kind === "coin" && c.coins === 2)).toHaveLength(35);
+    expect(cards.filter((c) => c.kind === "coin" && c.coins === 3)).toHaveLength(13);
+    expect(cards.filter((c) => c.kind === "event")).toHaveLength(16);
   });
 
   it("構成を差し替えると枚数も変わる", () => {

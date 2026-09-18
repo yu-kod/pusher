@@ -241,7 +241,7 @@ describe("viewFor（クライアントへ返す状態・docs/spec.md §8）", ()
 
 describe("ボール札の位置（docs/turn-structure.md §4-3）", () => {
   it("奥の山で唯一の公開情報として出す", () => {
-    const state = setupGame(["A", "B", "C"], createRng(1), withPreset("ballCards"));
+    const state = setupGame(["A", "B", "C"], createRng(1), DEFAULT_BALANCE);
 
     const view = viewFor(state, "p1");
 
@@ -250,13 +250,13 @@ describe("ボール札の位置（docs/turn-structure.md §4-3）", () => {
   });
 
   it("ボール札を使わない設定では null", () => {
-    const state = setupGame(["A", "B", "C"], createRng(1), DEFAULT_BALANCE);
+    const state = setupGame(["A", "B", "C"], createRng(1), withPreset("v02"));
 
     expect(viewFor(state, "p1").lanes.every((lane) => lane.ballIndex === null)).toBe(true);
   });
 
   it("中身までは見せない（枚数とボール札の位置だけ）", () => {
-    const state = setupGame(["A", "B", "C"], createRng(1), withPreset("ballCards"));
+    const state = setupGame(["A", "B", "C"], createRng(1), DEFAULT_BALANCE);
 
     const lane = viewFor(state, "p1").lanes[0];
 

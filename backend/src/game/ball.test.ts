@@ -27,14 +27,14 @@ function buildState(stock: Card[], pending: DeckCard[]): GameState {
 }
 
 describe("ボール札の置き方", () => {
-  it("既定では置かれない（v0.2 のまま）", () => {
-    const state = setupGame(["A", "B", "C"], createRng(1), DEFAULT_BALANCE);
+  it("v0.2 の設定では置かれない", () => {
+    const state = setupGame(["A", "B", "C"], createRng(1), withPreset("v02"));
 
     expect(state.lanes.every((lane) => lane.stock.every((c) => !isBallCard(c)))).toBe(true);
   });
 
-  it("ballCards を有効にすると、各レーンにちょうど1枚ずつ入る", () => {
-    const state = setupGame(["A", "B", "C"], createRng(1), withPreset("ballCards"));
+  it("既定では、各レーンにちょうど1枚ずつ入る", () => {
+    const state = setupGame(["A", "B", "C"], createRng(1), DEFAULT_BALANCE);
 
     for (const lane of state.lanes) {
       expect(lane.stock.filter(isBallCard)).toHaveLength(1);
@@ -42,7 +42,7 @@ describe("ボール札の置き方", () => {
   });
 
   it("いちばん奥に入るので、レーンの厚みぶん押し込まないと落ちない", () => {
-    const state = setupGame(["A", "B", "C"], createRng(1), withPreset("ballCards"));
+    const state = setupGame(["A", "B", "C"], createRng(1), DEFAULT_BALANCE);
 
     for (const lane of state.lanes) {
       expect(ballIndexOf(lane)).toBe(DEFAULT_BALANCE.initialLaneCards);
@@ -50,7 +50,7 @@ describe("ボール札の置き方", () => {
   });
 
   it("ボール札のぶんレーンが1枚厚くなる", () => {
-    const state = setupGame(["A", "B", "C"], createRng(1), withPreset("ballCards"));
+    const state = setupGame(["A", "B", "C"], createRng(1), DEFAULT_BALANCE);
 
     expect(state.lanes[0]?.stock).toHaveLength(DEFAULT_BALANCE.initialLaneCards + 1);
   });

@@ -253,7 +253,7 @@ describe("ボール札を見て狙う（docs/turn-structure.md §4-3）", () => 
 
   /** 同じ条件の3レーンのうち、laneIndex だけボール札を末端から depth 枚目に置く */
   function withBall(laneIndex: number, depth: number): GameState {
-    const base = buildState([1, 1, 1], [{}, {}, {}], { config: withPreset("ballCards") });
+    const base = buildState([1, 1, 1], [{}, {}, {}], { config: DEFAULT_BALANCE });
     return {
       ...base,
       lanes: base.lanes.map((lane, i) => ({
@@ -276,7 +276,7 @@ describe("ボール札を見て狙う（docs/turn-structure.md §4-3）", () => 
     // 押し込める枚数より深ければ今回は落ちないので、狙う理由にならない
     const deep = strategy.chooseInsertions(withBall(2, 5), createRng(1));
     const none = strategy.chooseInsertions(
-      buildState([1, 1, 1], [{}, {}, {}], { config: withPreset("ballCards") }),
+      buildState([1, 1, 1], [{}, {}, {}], { config: DEFAULT_BALANCE }),
       createRng(1)
     );
 
