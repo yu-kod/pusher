@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { sideHoleHint } from "./rules";
+import { laneName, sideHoleHint } from "./rules";
 
 describe("sideHoleHint", () => {
   it("目標値の下限が無ければ、横穴になる出目だけを伝える", () => {
@@ -12,5 +12,15 @@ describe("sideHoleHint", () => {
 
   it("目標値の下限があれば、条件も添える", () => {
     expect(sideHoleHint({ minRoll: 6, minTarget: 6 })).toBe("目標値6以上なら出目 6 は横穴");
+  });
+});
+
+describe("laneName", () => {
+  it("3本のレーンは左・中央・右で呼ぶ", () => {
+    expect([0, 1, 2].map(laneName)).toEqual(["左", "中央", "右"]);
+  });
+
+  it("名前が無い本数になっても、添字で呼べる", () => {
+    expect(laneName(3)).toBe("3");
   });
 });

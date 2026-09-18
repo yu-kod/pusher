@@ -18,3 +18,16 @@ export function sideHoleHint({ minRoll, minTarget }: SideHoleRule): string {
   // 下限が 1 なら目標値によらず起きるので、条件を添えない
   return minTarget <= 1 ? faces : `目標値${minTarget}以上なら${faces}`;
 }
+
+/** レーンの呼び名。名前を持たない本数になったら添字で呼ぶ */
+const LANE_NAMES = ["左", "中央", "右"];
+
+/**
+ * レーンを人が呼ぶ名前にする。
+ *
+ * 画面のどこでも同じ呼び方になるよう一箇所にまとめている。盤面のレーンと、
+ * 公開された宣言で呼び名が食い違うと、どこを狙ったのか読めなくなる。
+ */
+export function laneName(index: number): string {
+  return LANE_NAMES[index] ?? String(index);
+}

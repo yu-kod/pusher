@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { GameBoard } from "./GameBoard";
 import { buildGame, buildLane, buildPlayer, coin, eventCard } from "@/test-utils/game";
-import type { GameView } from "@/lib/types";
+import type { GameView, ResolutionStepView } from "@/lib/types";
 import type { InsertResult } from "@/lib/api";
 
 const CODE = "ABCDEF";
@@ -597,5 +597,318 @@ describe("公開された滞留にイベントカードがある場合", () => {
 
     const lane = screen.getByRole("button", { name: "左レーン" });
     expect(within(lane).getByRole("img", { name: "イベント: avalanche" })).toBeInTheDocument();
+  });
+});
+
+describe("3拍の進行", () => {
+  const NOW = 1_700_000_000_000;
+  const TICK = {
+    index: 3,
+    phase: "declaring",
+    deadlineAt: NOW + 8_000,
+    resolvedAt: null,
+    steps: [],
+  } as const satisfies GameView["tick"];
+
+  /** 先行権順に、はると → あき の2人ぶん。2人目は横穴 */
+  const STEPS: ResolutionStepView[] = [
+    {
+      playerId: "p2",
+      laneIndex: 1,
+      roll: 4,
+      pushedCount: 2,
+      droppedCount: 1,
+      gainedPoints: 3,
+      sideHole: false,
+    },
+    {
+      playerId: "p1",
+      laneIndex: 0,
+      roll: 6,
+      pushedCount: 1,
+      droppedCount: 0,
+      gainedPoints: 0,
+      sideHole: true,
+    },
+  ];
+
+  function tickGame(overrides: Partial<GameView> = {}): GameView {
+    return buildGame({
+      tick: TICK,
+      players: [
+        buildPlayer({
+          id: "p1",
+          name: "あき",
+          hand: { owner: true, cards: [coin(1), coin(2), coin(3)] },
+          declared: false,
+          declaration: null,
+        }),
+        buildPlayer({ id: "p2", name: "はると", declared: true, declaration: null }),
+        buildPlayer({ id: "p3", name: "そら", declared: false, declaration: null }),
+      ],
+      ...overrides,
+    });
+  }
+
+  const resolving = (steps: ResolutionStepView[] = STEPS): GameView =>
+    tickGame({ tick: { ...TICK, phase: "resolving", resolvedAt: NOW, steps } });
+
+  function atNow(game: GameView) {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    vi.setSystemTime(NOW);
+    return setup(game);
+  }
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("いまどの拍かを常に出しておく", () => {
+    atNow(tickGame());
+
+    expect(screen.getByTestId("tick-banner")).toHaveAttribute("data-phase", "declaring");
+  });
+
+  it("宣言の拍では、締め切りまでの残りと宣言した人数を出す", () => {
+    atNow(tickGame());
+
+    expect(screen.getByText("残り8秒")).toBeInTheDocument();
+    expect(screen.getByText("1/3人")).toBeInTheDocument();
+  });
+
+  it("宣言の拍では、誰が宣言を済ませたかが席に出る", () => {
+    atNow(tickGame());
+
+    expect(within(screen.getByLabelText("はるとの席")).getByText("宣言済み")).toBeInTheDocument();
+    expect(within(screen.getByLabelText("そらの席")).getByText("考え中")).toBeInTheDocument();
+  });
+
+  it("公開までは、他人が何を宣言したかが画面のどこにも出ない", () => {
+    const { container } = atNow(tickGame());
+
+    // サーバーは中身を送ってこないが、画面が推測して埋めることもしない（§8-3）
+    expect(screen.queryByTestId("reveal-row")).not.toBeInTheDocument();
+    expect(container.textContent).not.toMatch(/降りた/);
+  });
+
+  it("レーンと手札を選んで宣言できる", async () => {
+    const fetchMock = mockInsert();
+    const { user } = atNow(tickGame());
+
+    await user.click(screen.getByRole("button", { name: /2コイン札/ }));
+    await user.click(screen.getByRole("button", { name: "中央レーン" }));
+    await user.click(screen.getByRole("button", { name: "宣言する" }));
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalled());
+    expect(fetchMock.mock.calls[0]?.[0]).toBe(`/api/rooms/${CODE}/ticks/3/declarations`);
+  });
+
+  it("降りることも宣言できる", async () => {
+    const fetchMock = mockInsert();
+    const { user } = atNow(tickGame());
+
+    await user.click(screen.getByRole("button", { name: "降りる" }));
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalled());
+    expect(fetchMock.mock.calls[0]?.[1]).toMatchObject({
+      body: expect.stringContaining('"kind":"withdraw"'),
+    });
+  });
+
+  it("宣言を済ませたら、自分が何を宣言したかだけは見える", () => {
+    atNow(
+      tickGame({
+        players: [
+          buildPlayer({
+            id: "p1",
+            name: "あき",
+            hand: { owner: true, cards: [coin(1)] },
+            declared: true,
+            declaration: { kind: "insert", laneIndex: 0, handIndex: 0, card: coin(2) },
+          }),
+          buildPlayer({ id: "p2", name: "はると", declared: true, declaration: null }),
+        ],
+      })
+    );
+
+    expect(screen.getByText(/左へ 2コイン札 で宣言しました/)).toBeInTheDocument();
+  });
+
+  it("宣言を済ませたら、もう手札もレーンも選べない", () => {
+    atNow(
+      tickGame({
+        players: [
+          buildPlayer({
+            id: "p1",
+            name: "あき",
+            hand: { owner: true, cards: [coin(1)] },
+            declared: true,
+            declaration: { kind: "withdraw" },
+          }),
+        ],
+      })
+    );
+
+    expect(screen.getByRole("button", { name: "中央レーン" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /1コイン札/ })).toBeDisabled();
+  });
+
+  it("締め切りまでは、宣言を取り下げて選び直せる", async () => {
+    const fetchMock = mockInsert();
+    const { user } = atNow(
+      tickGame({
+        players: [
+          buildPlayer({
+            id: "p1",
+            name: "あき",
+            hand: { owner: true, cards: [coin(1)] },
+            declared: true,
+            declaration: { kind: "withdraw" },
+          }),
+        ],
+      })
+    );
+
+    await user.click(screen.getByRole("button", { name: "取り消す" }));
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalled());
+    // 取り下げは「降りる宣言」とは別物。選び直せる状態に戻すだけ（§8-3）
+    expect(fetchMock.mock.calls[0]?.[0]).toBe(`/api/rooms/${CODE}/ticks/3/declarations`);
+    expect(fetchMock.mock.calls[0]?.[1]).toMatchObject({ method: "DELETE" });
+  });
+
+  it("公開の拍では、全員の宣言が一斉に開く", () => {
+    atNow(
+      tickGame({
+        tick: { ...TICK, phase: "revealing" },
+        players: [
+          buildPlayer({
+            id: "p1",
+            name: "あき",
+            hand: { owner: true, cards: [coin(1)] },
+            declared: true,
+            declaration: { kind: "insert", laneIndex: 0, handIndex: 0, card: coin(2) },
+          }),
+          buildPlayer({
+            id: "p2",
+            name: "はると",
+            declared: true,
+            declaration: { kind: "withdraw" },
+          }),
+        ],
+      })
+    );
+
+    expect(screen.getAllByTestId("reveal-row")).toHaveLength(2);
+    expect(screen.getByText("降りた")).toBeInTheDocument();
+  });
+
+  it("公開の拍では、宣言の操作を出さない", () => {
+    atNow(tickGame({ tick: { ...TICK, phase: "revealing" } }));
+
+    expect(screen.queryByRole("button", { name: "宣言する" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "降りる" })).not.toBeInTheDocument();
+  });
+
+  it("解決の拍では、先頭の1人ぶんだけが動く", () => {
+    atNow(resolving());
+
+    expect(screen.getAllByTestId("resolution-step")).toHaveLength(1);
+    expect(screen.getByLabelText("出目 4")).toBeInTheDocument();
+    expect(screen.queryByLabelText("出目 6")).not.toBeInTheDocument();
+  });
+
+  it("時間が経つと、次の人へ進む", async () => {
+    atNow(resolving());
+
+    await vi.advanceTimersByTimeAsync(1_500);
+
+    await waitFor(() => expect(screen.getByLabelText("出目 6")).toBeInTheDocument());
+    expect(screen.getAllByTestId("resolution-step")).toHaveLength(1);
+  });
+
+  it("解決の拍では、いま誰の番が動いているかが分かる", () => {
+    atNow(resolving());
+
+    expect(within(screen.getByTestId("tick-banner")).getByText("はると")).toBeInTheDocument();
+  });
+
+  it("解決の拍では、いま動いている人の席だけが光る", () => {
+    atNow(resolving());
+
+    expect(screen.getByLabelText("はるとの席")).toHaveAttribute("data-current", "true");
+    expect(screen.getByLabelText("そらの席")).toHaveAttribute("data-current", "false");
+  });
+
+  it("再生しきったら、解決の表示を畳む", async () => {
+    atNow(resolving([STEPS[0] as ResolutionStepView]));
+
+    await vi.advanceTimersByTimeAsync(1_500);
+
+    await waitFor(() => expect(screen.queryByTestId("resolution-step")).not.toBeInTheDocument());
+  });
+
+  it("締め切りを過ぎても動かないときは、進行を1回だけ促す", async () => {
+    const fetchMock = mockInsert();
+    atNow(tickGame({ tick: { ...TICK, deadlineAt: NOW + 1_000 } }));
+
+    await vi.advanceTimersByTimeAsync(2_000);
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalled());
+    expect(fetchMock.mock.calls[0]?.[0]).toBe(`/api/rooms/${CODE}/ticks/3/resolve`);
+    await vi.advanceTimersByTimeAsync(3_000);
+    expect(fetchMock).toHaveBeenCalledOnce();
+  });
+
+  it("進行を促すのに失敗しても、画面は壊れない", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("offline")));
+    atNow(tickGame({ tick: { ...TICK, deadlineAt: NOW + 1_000 } }));
+
+    await vi.advanceTimersByTimeAsync(2_000);
+
+    // 肩を叩くだけなので、失敗をユーザーに見せない（§8-2）
+    await waitFor(() => expect(screen.getByTestId("tick-banner")).toBeInTheDocument());
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  it("解決の時刻がまだ来ていなければ、先頭から再生する", () => {
+    atNow(tickGame({ tick: { ...TICK, phase: "resolving", resolvedAt: null, steps: STEPS } }));
+
+    expect(screen.getByLabelText("出目 4")).toBeInTheDocument();
+  });
+
+  it("卓を離れた人の解決でも、画面は止まらない", () => {
+    const gone: ResolutionStepView = { ...(STEPS[0] as ResolutionStepView), playerId: "居ない人" };
+    atNow(tickGame({ tick: { ...TICK, phase: "resolving", resolvedAt: NOW, steps: [gone] } }));
+
+    expect(screen.getByTestId("resolution-step")).toBeInTheDocument();
+    expect(within(screen.getByTestId("tick-banner")).queryByText("はると")).not.toBeInTheDocument();
+  });
+
+  it("宣言したかどうかが届いていない席は、まだ考えていると見なす", () => {
+    atNow(
+      tickGame({
+        players: [
+          buildPlayer({ id: "p1", name: "あき", hand: { owner: true, cards: [coin(1)] } }),
+          buildPlayer({ id: "p2", name: "はると" }),
+        ],
+      })
+    );
+
+    expect(within(screen.getByLabelText("はるとの席")).getByText("考え中")).toBeInTheDocument();
+    expect(screen.getByText("0/2人")).toBeInTheDocument();
+  });
+
+  it("手番の人が卓に居なくても、席は光らない", () => {
+    setup(buildGame({ currentPlayerIndex: 9 }));
+
+    expect(screen.getByLabelText("はるとの席")).toHaveAttribute("data-current", "false");
+  });
+
+  it("サーバーが3拍を持っていなければ、今までどおり手番制で動く", () => {
+    setup(buildGame());
+
+    expect(screen.queryByTestId("tick-banner")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "投入する" })).toBeInTheDocument();
   });
 });
