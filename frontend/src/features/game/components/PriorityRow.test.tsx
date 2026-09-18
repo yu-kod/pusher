@@ -11,13 +11,7 @@ const players = [
 
 function renderRow(props: Partial<React.ComponentProps<typeof PriorityRow>> = {}) {
   return render(
-    <PriorityRow
-      players={players}
-      order={["p3", "p1", "p2"]}
-      movingId={null}
-      meId="p1"
-      {...props}
-    />
+    <PriorityRow players={players} order={[2, 0, 1]} movingIndex={null} meIndex={0} {...props} />
   );
 }
 
@@ -44,14 +38,14 @@ describe("PriorityRow", () => {
   });
 
   it("いま解決している人が分かる", () => {
-    renderRow({ movingId: "p1" });
+    renderRow({ movingIndex: 0 });
 
     const moving = screen.getAllByTestId("priority-seat")[1] as HTMLElement;
     expect(moving).toHaveAttribute("data-moving", "true");
   });
 
   it("解決していない間は、誰も動いていない", () => {
-    renderRow({ movingId: null });
+    renderRow({ movingIndex: null });
 
     expect(screen.getAllByTestId("priority-seat").every((n) => n.dataset.moving === "false")).toBe(
       true
@@ -64,8 +58,8 @@ describe("PriorityRow", () => {
     expect(screen.getByLabelText("先行権の順")).toBeInTheDocument();
   });
 
-  it("卓から外れた id が混ざっていても、残りを並べる", () => {
-    renderRow({ order: ["p3", "居ない人", "p1"] });
+  it("卓に居ない席が混ざっていても、残りを並べる", () => {
+    renderRow({ order: [2, 9, 0] });
 
     expect(screen.getAllByTestId("priority-seat")).toHaveLength(2);
   });

@@ -1,5 +1,5 @@
 /**
- * CPU プレイヤーの自動進行（#16）。
+ * CPU プレイヤーの自動宣言（#16）。
  *
  * 本ゲームでプレイヤーが考えるのは「投入したコインに対して獲得できるコインの
  * 期待値」ただ一点なので、CPU もシミュレーション（#49）と同じ期待値戦略を使う。
@@ -8,69 +8,59 @@
  * 人間と同じ情報しか見ない。レーンの奥の山と滞留の中身は使わず、枚数だけで判断する
  * （docs/spec.md §8）。
  */
-import { autoEventChooser } from "../game/chooser.js";
-import { endRound, endTurn } from "../game/progress.js";
 import type { Rng } from "../game/rng.js";
-import { resolveInsertionRound } from "../game/round.js";
 import type { GameState } from "../game/setup.js";
 import { expectedValueStrategy } from "../sim/strategy.js";
 import type { Room } from "./room.js";
+import { recordDeclaration, type Declaration, type TickSession } from "./tick-session.js";
 
 const strategy = expectedValueStrategy();
 
-/** 1手番ぶんを自動で打つ。投入できる札がなければ何もせずに返す */
-function playTurn(game: GameState, rng: Rng): GameState {
-  let current = game;
-
-  for (;;) {
-    const insertions = strategy.chooseInsertions(current, rng);
-    if (insertions.length === 0) {
-      break;
-    }
-
-    const result = resolveInsertionRound(current, insertions, autoEventChooser, rng);
-    current = result.state;
-
-    if (!result.canContinue || !strategy.shouldContinue(current, rng)) {
-      break;
-    }
-  }
-
-  return current;
-}
-
-/** 手番を終えて次へ回す。ラウンドが終わればラウンド終了処理も行う（docs/spec.md §3） */
-function finishTurn(game: GameState, rng: Rng): GameState {
-  const turn = endTurn(game);
-  return turn.roundEnded ? endRound(turn.state, rng, autoEventChooser).state : turn.state;
-}
-
 /**
- * 手番が CPU のあいだ、自動で進める。
+ * CPU の宣言を1ティックぶん入れる（`docs/spec.md` §3 ①）。
  *
- * 人間の手番になるか、ゲームが終わったら止まる。全員が CPU ならゲーム終了まで進む。
- * 1手番ごとに必ず手番が移るので、このループは必ず終わる。
+ * 人間と同じく、締め切りより前に伏せて出すだけ。解決は `advanceTick` が全員ぶんを
+ * まとめて行うので、ここでは盤面を動かさない。
+ *
+ * 冪等キーは「何ティック目の誰か」で決まる。同じリクエストが何度通っても、
+ * 同じ CPU が二重に宣言することはない（`docs/realtime.md` §8-4）。
  */
-export function playCpuTurns(room: Room, rng: Rng, now: number): Room {
-  if (room.game === null || room.game.phase !== "playing") {
+export function declareForCpus(room: Room, rng: Rng, now: number): Room {
+  const { game, tick } = room;
+  if (game === null || tick === null || tick.phase !== "declaring") {
     return room;
   }
 
-  let game = room.game;
-  let moved = false;
+  const cpuSeats = tick.active.filter((seat) =>
+    room.players.some((p) => p.id === game.players[seat]?.id && p.isCpu)
+  );
+  const declared = cpuSeats.reduce(
+    (session: TickSession, seat) =>
+      recordDeclaration(game, session, {
+        playerIndex: seat,
+        key: `cpu-${tick.index}-${seat}`,
+        declaration: chooseDeclaration(game, seat, rng),
+      }),
+    tick
+  );
 
-  while (game.phase === "playing") {
-    const player = game.players[game.currentPlayerIndex];
-    const isCpu = room.players.some((p) => p.id === player?.id && p.isCpu);
-    if (!isCpu) {
-      break;
-    }
+  return declared === tick ? room : { ...room, tick: declared, updatedAt: now };
+}
 
-    // 未確定得点の確定は endTurn が行う。
-    // 「投入口増設」の追加手番は扱わない（#16 の範囲外。手番は必ず1回で移る）
-    game = finishTurn(playTurn(game, rng), rng);
-    moved = true;
-  }
+/**
+ * CPU が何を宣言するかを決める。
+ *
+ * 期待値が正の投入が無ければ降りる。手札が尽きているときもここに来る
+ * （`chooseInsertions` が空を返す）。
+ *
+ * 1宣言は1レーン（`docs/spec.md` §3 手順1）なので、戦略が複数レーンを選ぶ設定
+ * （`maxLanesPerRound` を上げたプリセット）では先頭の1本だけを使う。
+ */
+function chooseDeclaration(game: GameState, seat: number, rng: Rng): Declaration {
+  const insertions = strategy.chooseInsertions({ ...game, currentPlayerIndex: seat }, rng);
+  const first = insertions[0];
 
-  return moved ? { ...room, game, updatedAt: now } : room;
+  return first === undefined
+    ? { kind: "withdraw" }
+    : { kind: "insert", laneIndex: first.laneIndex, handIndexes: [...first.handIndexes] };
 }

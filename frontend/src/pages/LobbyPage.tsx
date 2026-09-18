@@ -39,8 +39,16 @@ export function LobbyPage() {
     );
   }
 
-  if (room.game !== null) {
-    return <GameBoard code={code} game={room.game} credentials={credentials} reload={reload} />;
+  if (room.game !== null && room.tick !== null) {
+    return (
+      <GameBoard
+        code={code}
+        game={room.game}
+        tick={room.tick}
+        credentials={credentials}
+        reload={reload}
+      />
+    );
   }
 
   return (

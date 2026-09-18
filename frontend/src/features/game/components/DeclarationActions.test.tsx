@@ -50,13 +50,10 @@ describe("DeclarationActions", () => {
     expect(screen.getByRole("button", { name: "降りる" })).toBeEnabled();
   });
 
-  it("宣言したあとは、自分が何を宣言したかが見える", () => {
-    setup({
-      declared: { kind: "insert", laneIndex: 0, handIndex: 1, card: { kind: "coin", coins: 2 } },
-    });
+  it("宣言したあとは、自分がどのレーンを狙ったかが見える", () => {
+    setup({ declared: { kind: "insert", laneIndex: 0, handIndexes: [1] } });
 
-    expect(screen.getByText(/左へ/)).toBeInTheDocument();
-    expect(screen.getByText(/2コイン札/)).toBeInTheDocument();
+    expect(screen.getByText(/左レーンへ投入/)).toBeInTheDocument();
   });
 
   it("降りると宣言したあとも、それが見える", () => {

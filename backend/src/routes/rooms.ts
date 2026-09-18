@@ -20,13 +20,8 @@ import { Hono } from "hono";
 import { z } from "zod";
 import { DEFAULT_BALANCE, type Balance } from "../game/balance.js";
 import { autoEventChooser } from "../game/chooser.js";
-import { isCoinCard } from "../game/deck.js";
-import { endRound, endTurn } from "../game/progress.js";
 import { createRng, type Rng } from "../game/rng.js";
-import { resolveInsertionRound, type InsertionRoundResult } from "../game/round.js";
-import type { GameState } from "../game/setup.js";
 import { roomBody } from "../room/body.js";
-import { playCpuTurns } from "../room/cpu.js";
 import {
   createRoom,
   generateRoomCode,
@@ -36,6 +31,8 @@ import {
   type Room,
 } from "../room/room.js";
 import { RoomConflictError, type RoomStore, type StoredRoom } from "../room/store.js";
+import { runTick } from "../room/tick-runner.js";
+import { recordDeclaration, retractDeclaration, type TickDeps } from "../room/tick-session.js";
 import {
   forbidden,
   messageOf,
@@ -68,10 +65,21 @@ const nameSchema = z.object({
   isCpu: z.boolean().optional(),
 });
 
-const insertSchema = z.object({
-  laneIndex: z.number().int(),
-  handIndexes: z.array(z.number().int()).min(1),
-});
+/**
+ * 宣言（`docs/spec.md` §3 ①）。
+ *
+ * `key` は冪等キー。通信が切れてクライアントが同じ宣言を再送しても、
+ * 二重に処理しない（`docs/realtime.md` §8-4）。
+ */
+const declarationSchema = z.discriminatedUnion("kind", [
+  z.object({
+    kind: z.literal("insert"),
+    laneIndex: z.number().int(),
+    handIndexes: z.array(z.number().int()).min(1),
+    key: z.string().min(1),
+  }),
+  z.object({ kind: z.literal("withdraw"), key: z.string().min(1) }),
+]);
 
 /** Authorization: Bearer <token> から取り出す */
 function tokenOf(header: string | undefined): string | null {
@@ -79,40 +87,7 @@ function tokenOf(header: string | undefined): string | null {
   return match?.[1] ?? null;
 }
 
-/** 投入ラウンドの結果のうち、クライアントへ返してよいもの */
-type InsertResultBody = {
-  /** レーンごとの判定。既定のルールでは1件だけ */
-  lanes: { laneIndex: number; roll: number; outcome: string; target: number }[];
-  gainedPoints: number;
-  busted: boolean;
-  canContinue: boolean;
-  events: InsertionRoundResult["events"];
-  jackpot: InsertionRoundResult["jackpot"];
-};
-
-/**
- * 落下したカードそのものは返さない。
- *
- * 落ちた枚数と点数は分かるが、何が落ちたかは滞留とレーンの中身を推測する材料に
- * なるため、得点だけを返す（docs/spec.md §8）。
- */
-function insertResultBody(result: InsertionRoundResult): InsertResultBody {
-  return {
-    lanes: result.lanes.map(({ laneIndex, roll, outcome, target }) => ({
-      laneIndex,
-      roll,
-      outcome,
-      target,
-    })),
-    gainedPoints: result.gainedPoints,
-    busted: result.busted,
-    canContinue: result.canContinue,
-    events: result.events,
-    jackpot: result.jackpot,
-  };
-}
-
-/** ルール違反（エンジンや room.ts が投げる Error）を 422 に変換する */
+/** エンジンが投げたルール違反を 422 に変える。メッセージはそのまま返す */
 function asUnprocessable<T>(action: () => T): T {
   try {
     return action();
@@ -228,78 +203,93 @@ export function createRoomsRoute(deps: RoomsDeps) {
     const player = authenticate(room, c.req.header("Authorization"));
 
     const started = asUnprocessable(() => startGame(room, rngFor(), config, now()));
-    // 先頭が CPU なら、人間の手番になるまで自動で進める（#16）
-    const advanced = playCpuTurns(started, rngFor(), now());
+    // CPU がいれば、その場で宣言まで済ませる（#16）
+    const advanced = runTick(started, tickDeps(), now());
     await persist(advanced, deps.store.update(advanced, rev));
 
     return c.json(roomBody(advanced, player.id));
   });
 
-  /** 手番プレイヤー本人であることを確かめ、ゲームの状態を返す */
-  const requireTurn = (room: Room, header: string | undefined) => {
+  /** ゲームが始まっていることを確かめ、本人・盤面・ティックを返す */
+  const requirePlaying = (room: Room, header: string | undefined) => {
     const player = authenticate(room, header);
-    if (room.game === null) {
+    if (room.game === null || room.tick === null) {
       throw unprocessable("ゲームがまだ開始していない");
     }
-    if (room.game.players[room.game.currentPlayerIndex]?.id !== player.id) {
-      throw unprocessable("いまは手番ではない");
-    }
-    return { player, game: room.game };
+    const seat = room.game.players.findIndex((p) => p.id === player.id);
+    return { player, game: room.game, tick: room.tick, seat };
+  };
+
+  const tickDeps = (): TickDeps => ({ rng: rngFor(), chooser: autoEventChooser });
+
+  /** 進めて、CPU にも打たせて、保存して返す */
+  const commit = async (room: Room, rev: number, viewerId: string) => {
+    const saved = runTick(room, tickDeps(), now());
+    await persist(saved, deps.store.update(saved, rev));
+    return roomBody(saved, viewerId);
   };
 
   /**
-   * 手番を終えて次へ回す。ラウンドが終わればラウンド終了処理も行う（§3）。
+   * パスのティック番号が、いま開いているティックと一致するか。
    *
-   * ゲーム終了は endRound が判定する。
+   * 一致しなければクライアントが古い盤面を見ている。宣言を受けてしまうと、
+   * 解決済みの盤面に対して決めた手が通ることになる（`docs/realtime.md` §8-4）。
    */
-  const finishTurn = (game: GameState, rng: Rng): GameState => {
-    const turn = endTurn(game);
-    return turn.roundEnded ? endRound(turn.state, rng, autoEventChooser).state : turn.state;
+  const requireTick = (index: number, param: string): void => {
+    if (String(index) !== param) {
+      throw roomConflict(`このティックはもう閉じている: ${param}（いまは ${index}）`);
+    }
   };
 
-  // 投入。続けられなくなったら、その場で手番を終えて次へ回す
-  app.post("/:code/turns/insert", async (c) => {
+  // 宣言する。全員ぶんが揃えば、この場で解決まで進む（docs/realtime.md §8-2）
+  app.post("/:code/ticks/:tick/declarations", async (c) => {
     const { room, rev } = await load(c.req.param("code"));
-    const { player, game } = requireTurn(room, c.req.header("Authorization"));
+    const { player, game, tick, seat } = requirePlaying(room, c.req.header("Authorization"));
+    requireTick(tick.index, c.req.param("tick"));
 
-    const parsed = insertSchema.safeParse(await c.req.json().catch(() => null));
+    const parsed = declarationSchema.safeParse(await c.req.json().catch(() => null));
     if (!parsed.success) {
-      throw validationError("laneIndex と handIndexes（1つ以上の整数）が必要");
+      throw validationError("kind は insert か withdraw で、冪等キー key が必要");
     }
+    const { key, ...declaration } = parsed.data;
 
-    const rng = rngFor();
-    const result = asUnprocessable(() =>
-      resolveInsertionRound(
-        game,
-        [{ laneIndex: parsed.data.laneIndex, handIndexes: parsed.data.handIndexes }],
-        autoEventChooser,
-        rng
-      )
+    // 宣言が通らなければ、返るのは**宣言した本人にだけ**。「誰かの宣言が弾かれた」が
+    // 他人に見えると、それ自体が手がかりになる（§8-3）
+    const declared = asUnprocessable(() =>
+      recordDeclaration(game, tick, { playerIndex: seat, key, declaration })
     );
 
-    const next = result.canContinue ? result.state : finishTurn(result.state, rng);
-    const saved = playCpuTurns({ ...room, game: next, updatedAt: now() }, rngFor(), now());
-    await persist(saved, deps.store.update(saved, rev));
-
-    return c.json({ ...roomBody(saved, player.id), result: insertResultBody(result) });
+    return c.json(await commit({ ...room, tick: declared, updatedAt: now() }, rev, player.id));
   });
 
-  // やめる。未確定得点を確定して手番を終える（§3）
-  app.post("/:code/turns/stop", async (c) => {
+  // 宣言を取り下げる。まだ誰にも見えていないので、締め切りまでは何度でも変えられる
+  app.delete("/:code/ticks/:tick/declarations", async (c) => {
     const { room, rev } = await load(c.req.param("code"));
-    const { player, game } = requireTurn(room, c.req.header("Authorization"));
+    const { player, tick, seat } = requirePlaying(room, c.req.header("Authorization"));
+    requireTick(tick.index, c.req.param("tick"));
 
-    // パスはできない。投入できる札がない場合だけ、投入せずに終えられる
-    const hand = game.players.flatMap((p, i) => (i === game.currentPlayerIndex ? p.hand : []));
-    if (game.insertionRoundsThisTurn === 0 && hand.some(isCoinCard)) {
-      throw unprocessable("この手番はまだ1回も投入していない（パスはできない）");
+    const retracted = asUnprocessable(() => retractDeclaration(tick, seat));
+
+    return c.json(await commit({ ...room, tick: retracted, updatedAt: now() }, rev, player.id));
+  });
+
+  /**
+   * 締め切りを過ぎた卓の肩を叩く（docs/realtime.md §8-2）。
+   *
+   * サーバーに常駐タイマーは無いので、誰も操作していない卓は止まったままになる。
+   * クライアントが締め切りを過ぎたら1回投げる。
+   *
+   * すでに次のティックへ進んでいたら、何もせず現在の状態を返す。同時に何本届いても
+   * 1回しか進まないようにするため、ここはエラーにしない。
+   */
+  app.post("/:code/ticks/:tick/resolve", async (c) => {
+    const { room, rev } = await load(c.req.param("code"));
+    const { player, tick } = requirePlaying(room, c.req.header("Authorization"));
+    if (String(tick.index) !== c.req.param("tick")) {
+      return c.json(roomBody(room, player.id));
     }
 
-    const ended: Room = { ...room, game: finishTurn(game, rngFor()), updatedAt: now() };
-    const saved = playCpuTurns(ended, rngFor(), now());
-    await persist(saved, deps.store.update(saved, rev));
-
-    return c.json(roomBody(saved, player.id));
+    return c.json(await commit(room, rev, player.id));
   });
 
   // 状態取得。トークンを渡さなければ観戦者として扱う

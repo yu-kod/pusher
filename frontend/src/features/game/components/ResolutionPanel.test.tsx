@@ -1,17 +1,14 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { ResolutionPanel } from "./ResolutionPanel";
-import type { ResolutionStepView } from "@/lib/types";
+import { buildStep } from "@/test-utils/game";
 
-const step: ResolutionStepView = {
-  playerId: "p1",
-  laneIndex: 1,
-  roll: 4,
-  pushedCount: 2,
-  droppedCount: 1,
+const step = buildStep({
+  lanes: [
+    { laneIndex: 1, insertedCoins: 2, target: 4, roll: 4, outcome: "success", droppedCount: 1 },
+  ],
   gainedPoints: 3,
-  sideHole: false,
-};
+});
 
 describe("ResolutionPanel", () => {
   it("いま動いている人と、そのレーンを出す", () => {
@@ -21,11 +18,11 @@ describe("ResolutionPanel", () => {
     expect(screen.getByText(/中央/)).toBeInTheDocument();
   });
 
-  it("出目と、押し込んだ枚数と、落ちた枚数を出す", () => {
+  it("出目と、目標値と、落ちた枚数を出す", () => {
     render(<ResolutionPanel step={step} name="はると" />);
 
     expect(screen.getByLabelText("出目 4")).toBeInTheDocument();
-    expect(screen.getByText(/押し込み 2枚/)).toBeInTheDocument();
+    expect(screen.getByText(/目標値 4/)).toBeInTheDocument();
     expect(screen.getByText(/落下 1枚/)).toBeInTheDocument();
   });
 
@@ -36,7 +33,7 @@ describe("ResolutionPanel", () => {
   });
 
   it("横穴なら、それと分かる", () => {
-    render(<ResolutionPanel step={{ ...step, sideHole: true, gainedPoints: 0 }} name="そら" />);
+    render(<ResolutionPanel step={{ ...step, busted: true, gainedPoints: 0 }} name="そら" />);
 
     expect(screen.getByText(/横穴/)).toBeInTheDocument();
   });
