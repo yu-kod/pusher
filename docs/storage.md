@@ -21,7 +21,7 @@ Lambda はリクエストごとに別の実行環境へ振られうる。
 | 項目 | PK | SK | GSI1PK | GSI1SK | TTL |
 |---|---|---|---|---|---|
 | ルーム | `ROOM#<code>` | `ROOM` | — | — | `expiresAt` |
-| 接続（#15 の本番化） | `CONN#<connectionId>` | `CONN` | `ROOM#<code>` | `CONN#<id>` | `expiresAt` |
+| 接続（#90） | `CONN#<connectionId>` | `CONN` | `ROOM#<code>` | `CONN#<id>` | `expiresAt` |
 
 アクセスパターンはこれだけ。
 
@@ -32,6 +32,10 @@ Lambda はリクエストごとに別の実行環境へ振られうる。
 
 GSI1 は `GSI1PK` を持つ項目しか載らない（スパースインデックス）ので、
 ルームの書き込みに索引の費用は乗らない。Scan は使わない。
+
+GSI1 には `playerId` も載せる（`projection_type = "INCLUDE"`）。配信は接続ごとに
+マスク済みの別ペイロードを作るので、逆引きした時点で「その接続が誰向けか」が
+分からないと、接続の数だけ読み直すことになる（`docs/realtime.md` §4）。
 
 **ルームの状態は属性に分解せず、直列化した JSON を `body` に1つ置く。**
 `Balance.pushCount` が関数で、素朴な JSON 化では黙って消えるため、
@@ -60,7 +64,9 @@ API は「読む → エンジンで解決する → 書く」を素で行う。
 ## 4. TTL
 
 `expiresAt`（epoch 秒）に載せる。ルームは最終更新から 24 時間で消える
-（`backend/src/room/dynamo-store.ts` の `ROOM_TTL_SECONDS`）。
+（`backend/src/room/dynamo-store.ts` の `ROOM_TTL_SECONDS`）。接続は 2 時間
+（`backend/src/realtime/dynamo-registry.ts`）。API Gateway の接続自体が最長2時間なので、
+それより長く持っていても意味がない。
 アカウントの無いサービスなので、遊び終わった卓を溜め込まない。
 
 ## 5. 切り替え
@@ -73,6 +79,5 @@ API は「読む → エンジンで解決する → 書く」を素で行う。
 
 ## 6. 決めていないこと
 
-- 接続レジストリの実装（#15 の本番化）。テーブルと GSI と IAM はこの単位で用意してある
 - 終わったゲームの記録（統計・結果画面）。別のプレフィックスで同じテーブルに載る想定
 - バックアップ（PITR）。TTL で消える前提のデータなので、いまは取らない

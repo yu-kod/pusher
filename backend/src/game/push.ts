@@ -13,7 +13,33 @@
  */
 import { isCoinCard, isEventCard, type Card } from "./deck.js";
 import { totalPoints } from "./score.js";
-import type { GameState } from "./setup.js";
+import type { GameState, Player } from "./setup.js";
+
+/**
+ * いま解決しているプレイヤー。
+ *
+ * 未確定得点はプレイヤーごとに持つ（#88）。手番制では手番中の1人しか動かないが、
+ * ティック同時進行では同じラウンドの中で複数人が同時に抱えるため、
+ * 「いま解決しているプレイヤーのぶんだけ」を触る形に統一しておく。
+ */
+function currentPlayer(state: GameState): Player {
+  const player = state.players[state.currentPlayerIndex];
+  if (player === undefined) {
+    throw new RangeError(`手番プレイヤーがいない: ${state.currentPlayerIndex}`);
+  }
+  return player;
+}
+
+/** 手番プレイヤーだけを差し替えた players を返す */
+function updateCurrentPlayer(state: GameState, update: (player: Player) => Player): Player[] {
+  const updated = update(currentPlayer(state));
+  return state.players.map((p, index) => (index === state.currentPlayerIndex ? updated : p));
+}
+
+/** 手番プレイヤーの未確定得点（§3） */
+export function pendingPointsOf(state: GameState): number {
+  return currentPlayer(state).pendingPoints;
+}
 
 export type PushResult = {
   /** 押し込み・落下・補充を反映した状態。落下カードはまだ誰にも渡していない */
@@ -80,9 +106,14 @@ export function collectFallenCards(state: GameState, cards: readonly Card[]): Ga
   const coins = cards.filter(isCoinCard);
   const events = cards.filter(isEventCard);
 
+  const players = updateCurrentPlayer(state, (p) => ({
+    ...p,
+    pendingPoints: p.pendingPoints + totalPoints(coins),
+  }));
+
   return {
     ...state,
-    pendingPoints: state.pendingPoints + totalPoints(coins),
+    players,
     drawPile: [...state.drawPile, ...coins],
     discardPile: [...state.discardPile, ...events],
   };
@@ -94,14 +125,11 @@ export function collectFallenCards(state: GameState, cards: readonly Card[]): Ga
  * ここで手番が終わるので、投入ラウンドの回数も 0 に戻す。
  */
 export function bankPendingPoints(state: GameState): GameState {
-  const player = state.players[state.currentPlayerIndex];
-  if (player === undefined) {
-    throw new RangeError(`手番プレイヤーがいない: ${state.currentPlayerIndex}`);
-  }
+  const players = updateCurrentPlayer(state, (p) => ({
+    ...p,
+    points: p.points + p.pendingPoints,
+    pendingPoints: 0,
+  }));
 
-  const players = state.players.map((p, index) =>
-    index === state.currentPlayerIndex ? { ...p, points: p.points + state.pendingPoints } : p
-  );
-
-  return { ...state, players, pendingPoints: 0, insertionRoundsThisTurn: 0 };
+  return { ...state, players, insertionRoundsThisTurn: 0 };
 }

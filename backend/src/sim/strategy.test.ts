@@ -3,31 +3,35 @@ import { coin, faceDown } from "../test-utils/cards.js";
 import { DEFAULT_BALANCE, withPreset } from "../game/balance.js";
 import { createRng } from "../game/rng.js";
 import { setupGame, type GameState, type Lane } from "../game/setup.js";
+import { splitOverrides, withPendingPoints, type StateOverrides } from "../test-utils/state.js";
 import { expectedValueStrategy, randomStrategy } from "./strategy.js";
 
 function buildState(
   hand: readonly (1 | 2 | 3)[],
   lanes: readonly Partial<Lane>[] = [{}, {}, {}],
-  overrides?: Partial<GameState>
+  overrides?: StateOverrides
 ): GameState {
+  const { pendingPoints, rest } = splitOverrides(overrides);
   const base = setupGame(["A", "B", "C"], createRng(1), DEFAULT_BALANCE);
-  return {
-    ...base,
-    players: base.players.map((p, i) => ({
-      ...p,
-      hand: i === 0 ? hand.map((c) => coin(c)) : [],
-      points: 0,
-    })),
-    lanes: base.lanes.map((lane, i) => ({
-      ...lane,
-      stock: [coin(1), coin(1), coin(1), coin(1), coin(1)],
-      pending: [],
-      hasExtraSlot: false,
-      ...lanes[i],
-    })),
-    pendingPoints: 0,
-    ...overrides,
-  };
+  return withPendingPoints(
+    {
+      ...base,
+      players: base.players.map((p, i) => ({
+        ...p,
+        hand: i === 0 ? hand.map((c) => coin(c)) : [],
+        points: 0,
+      })),
+      lanes: base.lanes.map((lane, i) => ({
+        ...lane,
+        stock: [coin(1), coin(1), coin(1), coin(1), coin(1)],
+        pending: [],
+        hasExtraSlot: false,
+        ...lanes[i],
+      })),
+      ...rest,
+    },
+    pendingPoints
+  );
 }
 
 describe("randomStrategy", () => {

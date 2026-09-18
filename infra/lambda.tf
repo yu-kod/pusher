@@ -1,5 +1,8 @@
-# backend/dist には build:lambda が出力した lambda.js が入る。
-# WebSocket 用のハンドラ（ws.js）は #15 で追加する。
+# backend/dist には build:lambda が出力した lambda.js（HTTP API）と
+# ws.js（WebSocket API）が入る。2つの Lambda が同じ zip を別のハンドラで使う。
+#
+# AWS SDK も含めてバンドルしている。ランタイムに入っている SDK に頼ると、
+# どのクライアントが入っているかがランタイムの更新に左右される。
 data "archive_file" "lambda" {
   type        = "zip"
   source_dir  = "${path.module}/../backend/dist"
@@ -28,7 +31,7 @@ resource "aws_iam_role_policy_attachment" "lambda_basic" {
 }
 
 # アプリのテーブルへの読み書きだけを許す。
-# Query は GSI1（ルーム → 接続の逆引き、#15）で使う。
+# Query は GSI1（ルーム → 接続の逆引き、#90）で使う。
 resource "aws_iam_role_policy" "lambda_dynamodb" {
   name = "${var.project_name}-lambda-dynamodb"
   role = aws_iam_role.lambda.id
@@ -61,10 +64,12 @@ resource "aws_lambda_function" "api" {
   filename         = data.archive_file.lambda.output_path
   source_code_hash = data.archive_file.lambda.output_base64sha256
 
-  # これが無いとアプリはインメモリの保存先で起動する（backend/src/room/create-store.ts）
+  # これが無いとアプリはインメモリの保存先で起動する（backend/src/room/create-store.ts）。
+  # WS_ENDPOINT が無いと配信しない（そのときもポーリングで遊べる）
   environment {
     variables = {
       APP_TABLE_NAME = aws_dynamodb_table.app.name
+      WS_ENDPOINT    = local.ws_management_endpoint
     }
   }
 }

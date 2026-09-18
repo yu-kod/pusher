@@ -67,9 +67,14 @@ jobs:
             echo "s3_bucket=$(terraform output -raw frontend_bucket_name)"
             echo "cf_dist_id=$(terraform output -raw cloudfront_distribution_id)"
             echo "app_url=$(terraform output -raw app_url)"
+            echo "ws_url=$(terraform output -raw websocket_url)"
           } >> "$GITHUB_OUTPUT"
 
+      # WebSocket の繋ぎ先はビルド時に埋め込む。API Gateway の WebSocket API は
+      # 接続 URL にパスを付けられないため、CloudFront 経由にできない（docs/realtime.md §7）
       - name: Build Frontend
+        env:
+          VITE_WS_URL: ${{ steps.tf.outputs.ws_url }}
         run: npm run build:frontend
 
       - name: Deploy Frontend to S3

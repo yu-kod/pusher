@@ -51,7 +51,22 @@ export type RoomSocketOptions = {
 
 export type RoomSocket = { close: () => void };
 
+/**
+ * 繋ぎ先。
+ *
+ * ローカル開発は同じホストの `/ws`（vite が backend へプロキシする）。
+ * 本番はビルド時に `VITE_WS_URL` で API Gateway の WebSocket API を渡す。
+ * CloudFront は接続 URL にパスを付けられない WebSocket API を素通しできないので、
+ * ここだけ同一オリジンにしない（docs/realtime.md §7）。
+ *
+ * 渡されていなければ同じホストへ繋ぐ。繋がらなければポーリングのままになるだけで、
+ * 遊べなくはならない（§5）。
+ */
 function defaultUrl(): string {
+  const configured = import.meta.env.VITE_WS_URL;
+  if (configured !== undefined && configured !== "") {
+    return configured;
+  }
   const scheme = window.location.protocol === "https:" ? "wss:" : "ws:";
   return `${scheme}//${window.location.host}/ws`;
 }

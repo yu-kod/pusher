@@ -7,6 +7,8 @@ import { createRng } from "./rng.js";
 import { setupGame, type GameState, type Lane } from "./setup.js";
 import type { EventChooser } from "./resolve.js";
 import { resolveInsertionRound } from "./round.js";
+import { splitOverrides, withPendingPoints, type StateOverrides } from "../test-utils/state.js";
+import { pendingPointsOf } from "./push.js";
 
 /** レーン0・滞留の先頭を選ぶ chooser。イベントが落ちないテストでは使われない */
 const chooser: EventChooser = { chooseLane: () => 0, choosePending: () => 0 };
@@ -19,29 +21,32 @@ const chooser: EventChooser = { chooseLane: () => 0, choosePending: () => 0 };
 function buildState(
   hand: readonly (1 | 2 | 3)[],
   lanes: readonly Partial<Lane>[],
-  overrides?: Partial<GameState>
+  overrides?: StateOverrides
 ): GameState {
+  const { pendingPoints, rest } = splitOverrides(overrides);
   const base = setupGame(["A", "B", "C"], createRng(1), DEFAULT_BALANCE);
-  return {
-    ...base,
-    players: base.players.map((p, i) => ({
-      ...p,
-      hand: i === 0 ? hand.map((c) => coin(c)) : [],
-      points: 0,
-    })),
-    lanes: base.lanes.map((lane, i) => ({
-      ...lane,
-      stock: [],
-      pending: [],
-      hasExtraSlot: false,
-      ...lanes[i],
-    })),
-    drawPile: [],
-    pendingPoints: 0,
-    jackpotPoints: 0,
-    jackpotCounter: 0,
-    ...overrides,
-  };
+  return withPendingPoints(
+    {
+      ...base,
+      players: base.players.map((p, i) => ({
+        ...p,
+        hand: i === 0 ? hand.map((c) => coin(c)) : [],
+        points: 0,
+      })),
+      lanes: base.lanes.map((lane, i) => ({
+        ...lane,
+        stock: [],
+        pending: [],
+        hasExtraSlot: false,
+        ...lanes[i],
+      })),
+      drawPile: [],
+      jackpotPoints: 0,
+      jackpotCounter: 0,
+      ...rest,
+    },
+    pendingPoints
+  );
 }
 
 describe("resolveInsertionRound（投入ラウンド）", () => {
@@ -122,7 +127,7 @@ describe("resolveInsertionRound（投入ラウンド）", () => {
       scriptedRng([3])
     );
 
-    expect(result.state.pendingPoints).toBe(3);
+    expect(pendingPointsOf(result.state)).toBe(3);
     expect(result.gainedPoints).toBe(3);
   });
 
@@ -138,7 +143,7 @@ describe("resolveInsertionRound（投入ラウンド）", () => {
       scriptedRng([3])
     );
 
-    expect(result.state.pendingPoints).toBe(10);
+    expect(pendingPointsOf(result.state)).toBe(10);
     // gainedPoints はこのラウンドで得た点数だけを返す
     expect(result.gainedPoints).toBe(3);
   });
@@ -238,7 +243,7 @@ describe("resolveInsertionRound（投入ラウンド）", () => {
 
       // 積み上がっていた 9 点 + このラウンドの落下分 1 点
       expect(result.state.jackpotPoints).toBe(10);
-      expect(result.state.pendingPoints).toBe(0);
+      expect(pendingPointsOf(result.state)).toBe(0);
     });
 
     it("すでに確定した得点は失われない（docs/spec.md §3）", () => {
@@ -280,7 +285,7 @@ describe("resolveInsertionRound（投入ラウンド）", () => {
 
       expect(result.busted).toBe(false);
       expect(result.state.jackpotPoints).toBe(0);
-      expect(result.state.pendingPoints).toBeGreaterThan(9);
+      expect(pendingPointsOf(result.state)).toBeGreaterThan(9);
     });
 
     it("目標値が低くても出目6なら横穴になる（docs/spec.md §5 / #67）", () => {
@@ -404,7 +409,7 @@ describe("resolveInsertionRound（投入ラウンド）", () => {
     resolveInsertionRound(state, [{ laneIndex: 0, handIndexes: [0] }], chooser, scriptedRng([3]));
 
     expect(state.players[0]?.hand).toHaveLength(1);
-    expect(state.pendingPoints).toBe(0);
+    expect(pendingPointsOf(state)).toBe(0);
     expect(state.lanes[0]?.pending).toHaveLength(1);
   });
 
