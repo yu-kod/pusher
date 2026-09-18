@@ -4,7 +4,7 @@
 タイトルは「プッシャー台」と、それを囲む「卓」の二重の意味。
 ブラウザでオンライン対戦できる Web アプリとして実装する。
 
-ゲームのルールは [docs/spec.md](docs/spec.md) を参照。
+ゲームのルールは [docs/spec.md](docs/spec.md)、オンライン対戦の通信設計は [docs/realtime.md](docs/realtime.md) を参照。
 進行方式（同時進行・ボール札・先行権）の提案は [docs/turn-structure.md](docs/turn-structure.md) にある。
 
 ## 技術スタック
