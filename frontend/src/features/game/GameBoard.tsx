@@ -251,11 +251,6 @@ export function GameBoard({ code, game, credentials, reload }: Props) {
 
       {/* 卓。自分は手前、他のプレイヤーは周り、台は真ん中 */}
       <div className="relative min-h-0 flex-1">
-        <div className="absolute inset-x-0 top-1 flex justify-center gap-2">
-          {seatsAt("top").map((seat) => (
-            <SeatOf key={seat.player.id} seat={seat} movingId={movingId} phase={phase} />
-          ))}
-        </div>
         <div className="absolute top-1/2 left-1 flex -translate-y-1/2 flex-col gap-2">
           {seatsAt("left").map((seat) => (
             <SeatOf key={seat.player.id} seat={seat} movingId={movingId} phase={phase} />
@@ -267,8 +262,20 @@ export function GameBoard({ code, game, credentials, reload }: Props) {
           ))}
         </div>
 
-        {/* 卓の中央。プッシャー台と山札 */}
-        <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 px-[4.5rem]">
+        {/*
+         * 向かいの席と卓の中央は同じ流れに置く。別々の層に絶対配置すると、
+         * レーンが深くなったぶんだけ台が伸びて席に乗り上げる。左右の席は
+         * 上下の中央に貼りつくので、縦には干渉しない
+         */}
+        <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 px-[4.5rem] py-1">
+          {seatsAt("top").length > 0 && (
+            <div className="flex shrink-0 justify-center gap-2">
+              {seatsAt("top").map((seat) => (
+                <SeatOf key={seat.player.id} seat={seat} movingId={movingId} phase={phase} />
+              ))}
+            </div>
+          )}
+
           <Piles drawCount={game.drawPileCount} discardCount={game.discardPileCount} />
 
           <section
