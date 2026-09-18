@@ -506,9 +506,11 @@ describe("スタートプレイヤーの交代（docs/spec.md §3）", () => {
   const noShuffle = { shuffle: <T>(items: readonly T[]): T[] => [...items] };
   const rng = { ...scriptedRng([]), ...noShuffle };
   const plenty = () => Array.from({ length: 20 }, () => coin(1));
+  /** v0.3 でスタートプレイヤーの役は廃止された。交代の挙動は v0.2 の設定で見る */
+  const rotating = withPreset("v02");
 
   it("ラウンド終了ごとにスタートプレイヤーが次へ回る", () => {
-    const state = buildState({ drawPile: plenty() });
+    const state = buildState({ drawPile: plenty(), config: rotating });
 
     const next = endRound(state, rng, chooser).state;
 
@@ -517,7 +519,12 @@ describe("スタートプレイヤーの交代（docs/spec.md §3）", () => {
   });
 
   it("最後のプレイヤーまで回ったら先頭へ戻る", () => {
-    const state = buildState({ drawPile: plenty(), startPlayerIndex: 2, currentPlayerIndex: 2 });
+    const state = buildState({
+      drawPile: plenty(),
+      startPlayerIndex: 2,
+      currentPlayerIndex: 2,
+      config: rotating,
+    });
 
     expect(endRound(state, rng, chooser).state.startPlayerIndex).toBe(0);
   });

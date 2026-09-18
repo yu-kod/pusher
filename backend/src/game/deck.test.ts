@@ -68,12 +68,12 @@ describe("createDeck", () => {
 describe("DEFAULT_DECK_CONFIG", () => {
   const deck = createDeck(DEFAULT_DECK_CONFIG);
 
-  it("総枚数が 90 枚になる（docs/spec.md §1）", () => {
-    expect(deck).toHaveLength(90);
+  it("総枚数が 104 枚になる（docs/spec.md v0.3 §1）", () => {
+    expect(deck).toHaveLength(104);
   });
 
   it("イベントカードがデッキ全体の約 15% を占める（docs/spec.md §1）", () => {
-    expect(deck.filter(isEventCard)).toHaveLength(14);
+    expect(deck.filter(isEventCard)).toHaveLength(16);
     expect(deck.filter(isEventCard).length / deck.length).toBeCloseTo(0.15, 1);
   });
 
@@ -87,7 +87,7 @@ describe("DEFAULT_DECK_CONFIG", () => {
 
   it("コインカードの構成比が 46 / 39 / 15 に近い（docs/spec.md §1）", () => {
     const coins = deck.filter(isCoinCard);
-    expect(coins).toHaveLength(76);
+    expect(coins).toHaveLength(88);
 
     // 3コイン札は #53 のシミュレーションで 25% → 15% に下げた
     const ratio = (n: 1 | 2 | 3) => coins.filter((c) => c.coins === n).length / coins.length;

@@ -104,6 +104,18 @@ describe("simulateGame", () => {
 
     expect(stats.finished).toBe(true);
   });
+
+  it("手番制でドローを止めると、手番の頭で投入できず降りさせられる人が出る", () => {
+    const stats = simulateGame(
+      withPreset("v02", "noRoundDraw"),
+      expectedValueStrategy(),
+      createRng(1),
+      PLAYERS
+    );
+
+    expect(stats.finished).toBe(true);
+    expect(stats.forcedStops).toBeGreaterThan(0);
+  });
 });
 
 describe("summarize", () => {
@@ -225,7 +237,7 @@ describe("判断が発生しているかの指標（docs/spec.md §7 / #56）", 
 });
 
 describe("ティック同時進行（docs/turn-structure.md §4-1）", () => {
-  const tick = withPreset("tickMode");
+  const tick = withPreset("v02", "tickMode");
 
   it("同時進行でも完走する", () => {
     const stats = simulateGame(tick, expectedValueStrategy(), createRng(1), PLAYERS);
@@ -241,7 +253,7 @@ describe("ティック同時進行（docs/turn-structure.md §4-1）", () => {
   it("ティック数を数える。手番制では 0 のまま", () => {
     const simultaneous = simulateGame(tick, expectedValueStrategy(), createRng(2), PLAYERS);
     const sequential = simulateGame(
-      DEFAULT_BALANCE,
+      withPreset("v02"),
       expectedValueStrategy(),
       createRng(2),
       PLAYERS
@@ -274,7 +286,7 @@ describe("ティック同時進行（docs/turn-structure.md §4-1）", () => {
 
   it("手札が尽きて誰も投入できないラウンドがあっても完走する", () => {
     const stats = simulateGame(
-      withPreset("tickMode", "noRoundDraw"),
+      withPreset("v02", "tickMode", "noRoundDraw"),
       expectedValueStrategy(),
       createRng(1),
       PLAYERS
@@ -313,7 +325,7 @@ describe("ティック同時進行（docs/turn-structure.md §4-1）", () => {
 });
 
 describe("先行権（docs/turn-structure.md §4-2 / #98）", () => {
-  const priority = withPreset("tickPriority");
+  const priority = withPreset("v02", "tickPriority");
 
   it("先行権つきでも完走する", () => {
     const stats = simulateGame(priority, expectedValueStrategy(), createRng(1), PLAYERS);
@@ -335,7 +347,7 @@ describe("先行権（docs/turn-structure.md §4-2 / #98）", () => {
   it("解決順が変わるので、席順のままの同時進行とは違う結果になる", () => {
     const withPriority = simulateGame(priority, expectedValueStrategy(), createRng(3), PLAYERS);
     const bySeat = simulateGame(
-      withPreset("tickMode"),
+      withPreset("v02", "tickMode"),
       expectedValueStrategy(),
       createRng(3),
       PLAYERS
@@ -346,7 +358,7 @@ describe("先行権（docs/turn-structure.md §4-2 / #98）", () => {
 
   it("手札が尽きるほうへ寄せても完走する", () => {
     const stats = simulateGame(
-      withPreset("tickPriority", "noRoundDraw"),
+      withPreset("v02", "tickPriority", "noRoundDraw"),
       expectedValueStrategy(),
       createRng(1),
       PLAYERS
@@ -363,7 +375,7 @@ describe("先行権（docs/turn-structure.md §4-2 / #98）", () => {
 });
 
 describe("ボール札（docs/turn-structure.md §4-3 / #100）", () => {
-  const ball = withPreset("tickBall");
+  const ball = withPreset("v02", "tickBall");
 
   it("本命案の3点セットで完走する", () => {
     const stats = simulateGame(ball, expectedValueStrategy(), createRng(1), PLAYERS);
@@ -378,7 +390,7 @@ describe("ボール札（docs/turn-structure.md §4-3 / #100）", () => {
   it("ボール札が落ちる。使わない設定では 0 のまま", () => {
     const withBall = simulateGame(ball, expectedValueStrategy(), createRng(2), PLAYERS);
     const without = simulateGame(
-      withPreset("tickPriority"),
+      withPreset("v02", "tickPriority"),
       expectedValueStrategy(),
       createRng(2),
       PLAYERS
@@ -401,7 +413,7 @@ describe("ボール札（docs/turn-structure.md §4-3 / #100）", () => {
 
   it("ボール札を使わない設定では場に1枚も無い", () => {
     const stats = simulateGame(
-      withPreset("tickPriority"),
+      withPreset("v02", "tickPriority"),
       expectedValueStrategy(),
       createRng(2),
       PLAYERS
@@ -412,7 +424,7 @@ describe("ボール札（docs/turn-structure.md §4-3 / #100）", () => {
 
   it("手番制でもボール札だけ足せる", () => {
     const stats = simulateGame(
-      withPreset("ballCards"),
+      withPreset("v02", "ballCards"),
       expectedValueStrategy(),
       createRng(1),
       PLAYERS
@@ -426,7 +438,7 @@ describe("ボール札（docs/turn-structure.md §4-3 / #100）", () => {
     const summary = simulateMany(20, ball, expectedValueStrategy(), createRng(1), PLAYERS);
     const without = simulateMany(
       20,
-      withPreset("tickPriority"),
+      withPreset("v02", "tickPriority"),
       expectedValueStrategy(),
       createRng(1),
       PLAYERS
@@ -453,7 +465,8 @@ describe("ボール札（docs/turn-structure.md §4-3 / #100）", () => {
 });
 
 describe("採用案 A''（docs/turn-structure.md §9）", () => {
-  const adopted = withPreset("tickBallDeep");
+  /** 採用案 A'' はもう既定値そのもの（#121） */
+  const adopted = DEFAULT_BALANCE;
 
   it("完走する", () => {
     expect(simulateGame(adopted, expectedValueStrategy(), createRng(1), PLAYERS).finished).toBe(
@@ -469,7 +482,7 @@ describe("採用案 A''（docs/turn-structure.md §9）", () => {
     const deep = simulateMany(50, adopted, expectedValueStrategy(), createRng(11), PLAYERS);
     const shallow = simulateMany(
       50,
-      withPreset("tickBall"),
+      withPreset("v02", "tickBall"),
       expectedValueStrategy(),
       createRng(11),
       PLAYERS

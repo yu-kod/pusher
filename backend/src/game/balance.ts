@@ -8,7 +8,7 @@
  * 各値には出典（docs/spec.md のどこ由来か）と、§7 の検証項目に該当する場合は
  * 何と比較すべきかを添えてある。
  */
-import { DEFAULT_DECK_CONFIG, type DeckConfig } from "./deck.js";
+import { DEFAULT_DECK_CONFIG, V02_DECK_CONFIG, type DeckConfig } from "./deck.js";
 
 /**
  * 横穴（バースト）の発生条件（docs/spec.md §5）。
@@ -260,17 +260,27 @@ export type Balance = {
 
 const LANE_COUNT = 3;
 
+/**
+ * 既定の調整値（docs/spec.md **v0.3** = `docs/turn-structure.md` §9 の採用案 A''）。
+ *
+ * 3拍の同時進行・先行権・ボール札・深いレーンは**セットで効く**。同時進行が
+ * 「取り合いが起きる状況」を作り、ボール札が「取り合う対象」を置き、先行権が
+ * 「取り合いの勝敗を判断で決める」。1つだけ外すと指標がまったく動かないので、
+ * どれか1つを「効いていない」と判断して外さないこと（§9 の実測）。
+ *
+ * v0.2 の値に戻すにはプリセット `v02` を使う。
+ */
 export const DEFAULT_BALANCE: Balance = {
   laneCount: LANE_COUNT,
-  initialLaneCards: 5,
+  initialLaneCards: 12,
   initialPendingCards: 9,
   initialHandSize: 5,
   initialHandBonusPerSeat: 1,
   deck: DEFAULT_DECK_CONFIG,
 
-  progressMode: "turn",
-  useResolutionPriority: false,
-  useBallCards: false,
+  progressMode: "tick",
+  useResolutionPriority: true,
+  useBallCards: true,
   ballPoints: 10,
   maxLanesPerRound: 1,
   maxInsertionRoundsPerTurn: null,
@@ -278,7 +288,7 @@ export const DEFAULT_BALANCE: Balance = {
   roundLaneRefillCount: 0,
   handLimit: null,
   maxRounds: 13,
-  rotateStartPlayer: true,
+  rotateStartPlayer: false,
 
   pushCount: (totalCoins) => Math.ceil(totalCoins / 2),
 
@@ -300,14 +310,32 @@ export const BALANCE_PRESETS = {
   lanes4: { laneCount: 4 },
 
   /**
+   * spec v0.2 の既定値に丸ごと戻す。
+   *
+   * 既定が採用案 A''（3拍・先行権・ボール札・深いレーン）になったので、
+   * **段階ごとの比較はこれを土台にして重ねる。** 例えば「同時進行だけを足した形」は
+   * `withPreset("v02", "tickMode")`、「本命案の3点セット」は
+   * `withPreset("v02", "tickBall")`。
+   */
+  v02: {
+    progressMode: "turn" as const,
+    useResolutionPriority: false,
+    useBallCards: false,
+    rotateStartPlayer: true,
+    initialLaneCards: 5,
+    deck: V02_DECK_CONFIG,
+  },
+
+  /**
    * #53 以前の既定: 3コイン札をコイン札の 25% に戻す。
    *
-   *   1コイン 30 (39.5%) / 2コイン 27 (35.5%) / 3コイン 19 (25.0%)
+   *   1コイン 36 (40.9%) / 2コイン 30 (34.1%) / 3コイン 22 (25.0%)
    *
-   * 既定は 14.5%。3コイン札は目標値が高く押し込み枚数も多い二重の優位があり、
+   * 既定は 14.8%。3コイン札は目標値が高く押し込み枚数も多い二重の優位があり、
    * 25% では投入1枚あたりの回収が 1.99 まで膨らむ（§7 次点）。
+   * コイン札の総枚数（88枚）は既定と変えていないので、比べているのは比率だけ。
    */
-  coin3Ratio25: { deck: { ...DEFAULT_DECK_CONFIG, coins: { 1: 30, 2: 27, 3: 19 } } },
+  coin3Ratio25: { deck: { ...DEFAULT_DECK_CONFIG, coins: { 1: 36, 2: 30, 3: 22 } } },
 
   /** §7: ラウンド終了時のドローを廃止する */
   noRoundDraw: { roundDrawCount: 0 },
@@ -327,6 +355,8 @@ export const BALANCE_PRESETS = {
    * 1ティックで参加中の全員が同時に1投入ラウンドを行い、解決は1人ずつ順に。
    * 待ち時間の割合が下がるかわりに、1ティックで最大4枚が投入されるので
    * 滞留が厚くなる方向に動く。初期滞留の調整が要るかを測るためのプリセット。
+   *
+   * 既定がもう3拍なので、単体では効かない。`withPreset("v02", "tickMode")` で使う。
    */
   tickMode: { progressMode: "tick" as const },
 
@@ -359,24 +389,13 @@ export const BALANCE_PRESETS = {
   },
 
   /**
-   * §9 の採用案 A''。本命案の3点セットに、**深いレーン**を足したもの。
+   * 採用案 A' — カードを増やさずに同じ深さを作る。
    *
-   * レーン6枚ではボール札が1ゲーム35回落ちて「大物」にならなかった。深さ13枚にすると
-   * 3〜4ラウンドに1回まで落ち着く。そのぶんのカードとしてデッキを14枚足す（90 → 104）。
-   * カードを増やしたくない場合は `initialPendingCards` を 5 へ下げれば 90枚のままでも
-   * 同じ深さにできる（滞留が薄くなるぶん目標値は下がる）。
+   * 既定（A''）はレーンを深くしたぶんデッキを14枚足している。A' は足すかわりに
+   * 初期滞留を 9 → 5 に回して90枚のままにする。**骨格は同じで、深さを何で
+   * 捻出するかだけが違う。** 滞留が薄くなるぶん目標値は下がる。
    */
-  tickBallDeep: {
-    progressMode: "tick" as const,
-    useResolutionPriority: true,
-    rotateStartPlayer: false,
-    useBallCards: true,
-    initialLaneCards: 12,
-    deck: {
-      coins: { 1: 40, 2: 35, 3: 13 },
-      events: { avalanche: 5, openLane: 5, extraSlot: 3, lottery: 3 },
-    },
-  },
+  deckA: { initialPendingCards: 5, deck: V02_DECK_CONFIG },
 
   /** #68 以前の既定: 全員に同じ枚数を配る（先手の勝率が 0.28 まで上がる） */
   noHandBonus: { initialHandBonusPerSeat: 0 },

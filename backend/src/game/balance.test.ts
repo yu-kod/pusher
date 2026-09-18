@@ -11,13 +11,25 @@ import {
 describe("DEFAULT_BALANCE", () => {
   it("設計書どおりの既定値になっている（docs/spec.md §1 §2 §3 §5）", () => {
     expect(DEFAULT_BALANCE.laneCount).toBe(3);
-    expect(DEFAULT_BALANCE.initialLaneCards).toBe(5);
+    expect(DEFAULT_BALANCE.initialLaneCards).toBe(12);
     expect(DEFAULT_BALANCE.initialHandSize).toBe(5);
     expect(DEFAULT_BALANCE.maxRounds).toBe(13);
     expect(DEFAULT_BALANCE.jackpotThreshold).toBe(5);
     expect(DEFAULT_BALANCE.roundDrawCount).toBe(3);
     expect(DEFAULT_BALANCE.roundLaneRefillCount).toBe(0);
     expect(DEFAULT_BALANCE.handLimit).toBeNull();
+  });
+
+  it("3拍の同時進行・先行権・ボール札が既定で入っている（spec v0.3 §3）", () => {
+    // この3つはセットで効く。同時進行が取り合いの起きる状況を作り、ボール札が
+    // 取り合う対象を置き、先行権が取り合いの勝敗を判断で決める（§9）
+    expect(DEFAULT_BALANCE.progressMode).toBe("tick");
+    expect(DEFAULT_BALANCE.useResolutionPriority).toBe(true);
+    expect(DEFAULT_BALANCE.useBallCards).toBe(true);
+  });
+
+  it("スタートプレイヤーの交代はしない。順番は先行権が決める（spec v0.3 §3）", () => {
+    expect(DEFAULT_BALANCE.rotateStartPlayer).toBe(false);
   });
 
   it("コイン札の構成比が 46 / 39 / 15 に近い（docs/spec.md §1）", () => {
@@ -85,6 +97,32 @@ describe("BALANCE_PRESETS（docs/spec.md §7 の検証項目）", () => {
         "jackpotHalfCarryOver",
       ])
     );
+  });
+
+  describe("v02（spec v0.2 の既定値に戻す）", () => {
+    it("進行方式も先行権もボール札も v0.2 に戻る", () => {
+      const balance = withPreset("v02");
+
+      expect(balance.progressMode).toBe("turn");
+      expect(balance.useResolutionPriority).toBe(false);
+      expect(balance.useBallCards).toBe(false);
+      expect(balance.rotateStartPlayer).toBe(true);
+    });
+
+    it("レーンの深さとデッキも v0.2 に戻る", () => {
+      const balance = withPreset("v02");
+
+      expect(balance.initialLaneCards).toBe(5);
+      expect(createDeck(balance.deck)).toHaveLength(90);
+    });
+
+    it("段階ごとのプリセットは v02 に重ねて比較する", () => {
+      // 既定がもう3拍なので、単体では差が出ない。v0.2 を土台に1つずつ足して測る
+      const balance = withPreset("v02", "tickMode");
+
+      expect(balance.progressMode).toBe("tick");
+      expect(balance.useBallCards).toBe(false);
+    });
   });
 
   it("どのプリセットを適用しても Balance として成立する", () => {
