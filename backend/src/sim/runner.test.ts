@@ -361,3 +361,93 @@ describe("先行権（docs/turn-structure.md §4-2 / #98）", () => {
     expect(run()).toEqual(run());
   });
 });
+
+describe("ボール札（docs/turn-structure.md §4-3 / #100）", () => {
+  const ball = withPreset("tickBall");
+
+  it("本命案の3点セットで完走する", () => {
+    const stats = simulateGame(ball, expectedValueStrategy(), createRng(1), PLAYERS);
+
+    expect(stats.finished).toBe(true);
+  });
+
+  it("3人でも回る", () => {
+    expect(simulateGame(ball, randomStrategy(), createRng(5), 3).finished).toBe(true);
+  });
+
+  it("ボール札が落ちる。使わない設定では 0 のまま", () => {
+    const withBall = simulateGame(ball, expectedValueStrategy(), createRng(2), PLAYERS);
+    const without = simulateGame(
+      withPreset("tickPriority"),
+      expectedValueStrategy(),
+      createRng(2),
+      PLAYERS
+    );
+
+    expect(withBall.ballDrops).toBeGreaterThan(0);
+    expect(without.ballDrops).toBe(0);
+  });
+
+  it("ボール札はレーンから消えない。何度落ちても場には常にレーン数ぶんある", () => {
+    // 落ちる経路は押し出しと「もう1枚落とす」（§6-3）の2つ。片方でも入れ直しを
+    // 忘れるとレーンから静かに消え、そのレーンを狙う理由だけが失われる
+    for (let seed = 1; seed <= 20; seed++) {
+      const stats = simulateGame(ball, expectedValueStrategy(), createRng(seed), PLAYERS);
+
+      expect(stats.finalBallCount).toBe(DEFAULT_BALANCE.laneCount);
+      expect(stats.ballDrops).toBeGreaterThan(0);
+    }
+  });
+
+  it("ボール札を使わない設定では場に1枚も無い", () => {
+    const stats = simulateGame(
+      withPreset("tickPriority"),
+      expectedValueStrategy(),
+      createRng(2),
+      PLAYERS
+    );
+
+    expect(stats.finalBallCount).toBe(0);
+  });
+
+  it("手番制でもボール札だけ足せる", () => {
+    const stats = simulateGame(
+      withPreset("ballCards"),
+      expectedValueStrategy(),
+      createRng(1),
+      PLAYERS
+    );
+
+    expect(stats.finished).toBe(true);
+    expect(stats.ballDrops).toBeGreaterThan(0);
+  });
+
+  it("落下回数とレーンの厚みを集計する", () => {
+    const summary = simulateMany(20, ball, expectedValueStrategy(), createRng(1), PLAYERS);
+    const without = simulateMany(
+      20,
+      withPreset("tickPriority"),
+      expectedValueStrategy(),
+      createRng(1),
+      PLAYERS
+    );
+
+    expect(summary.avgBallDrops).toBeGreaterThan(0);
+    // レーンは「もう1枚落とす」（§6-3）で少しずつ薄くなる。補充はしない（§4-3）ので
+    // 終了時は初期値より薄い。ボール札は入れ直すぶん、その1枚だけ厚い側に出る
+    expect(summary.avgFinalLaneStock).toBeGreaterThan(without.avgFinalLaneStock);
+  });
+
+  it("ゲームが 0 件でも壊れない", () => {
+    const summary = summarize([]);
+
+    expect(summary.avgBallDrops).toBe(0);
+    expect(summary.avgFinalLaneStock).toBe(0);
+  });
+
+  it("同じシードなら同じ結果になる（再現性）", () => {
+    const run = () => simulateGame(ball, expectedValueStrategy(), createRng(42), PLAYERS);
+
+    expect(run()).toEqual(run());
+  });
+});

@@ -17,6 +17,7 @@
  */
 import type { Balance, SideHoleRule } from "./balance.js";
 import type { Card } from "./deck.js";
+import { ballIndexOf } from "./ball.js";
 import type { GamePhase, GameState, PlayerId } from "./setup.js";
 import { pendingPointsOf } from "./push.js";
 
@@ -32,6 +33,14 @@ export type PendingCardView = { faceUp: true; card: Card } | { faceUp: false };
 export type LaneView = {
   /** 奥の山は枚数のみ。中身は誰にも見えない */
   stockCount: number;
+  /**
+   * ボール札が末端から何枚目にあるか（`docs/turn-structure.md` §4-3）。
+   *
+   * **奥の山で唯一の公開情報。** 列の中で1枚だけ表向きに置かれているので、
+   * 「あと何枚押し込めば落ちるか」は卓上でも全員に見えている。ここを隠すと
+   * 同じレーンを狙う理由そのものが消える。ボール札を使わない設定では null。
+   */
+  ballIndex: number | null;
   pending: PendingCardView[];
   hasExtraSlot: boolean;
 };
@@ -122,6 +131,7 @@ export function viewFor(state: GameState, viewerId: PlayerId): GameView {
 
     lanes: state.lanes.map((lane) => ({
       stockCount: lane.stock.length,
+      ballIndex: ballIndexOf(lane),
       pending: lane.pending.map((p): PendingCardView =>
         p.faceUp ? { faceUp: true, card: p.card } : { faceUp: false }
       ),

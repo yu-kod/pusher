@@ -11,7 +11,8 @@
  * - `lane.stock` — 添字 0 が末端（落下口）側、末尾が奥側。落下は先頭から、押し込みは末尾へ
  * - `lane.pending` — 添字 0 が奥側（レーンに近い側）。先に入ったカードから押し込まれる
  */
-import { isCoinCard, isEventCard, type Card } from "./deck.js";
+import { restockBalls } from "./ball.js";
+import { isBallCard, isCoinCard, isEventCard, type Card } from "./deck.js";
 import { totalPoints } from "./score.js";
 import type { GameState, Player } from "./setup.js";
 
@@ -84,11 +85,19 @@ export function resolvePush(
 
   // 4-3. 補充は行わない — 押し込んだ枚数と落ちた枚数が等しいため、
   // レーンの厚みはこれで一定に保たれる（docs/spec.md §4-3）
+  //
+  // ただしボール札は例外で、落ちたら同じ枚数だけ奥へ入れ直す
+  // （`docs/turn-structure.md` §4-3）。ここでも厚みは変わらない
+  const restocked = restockBalls(afterFall, fallenCards);
   const lanes = state.lanes.map((l, index) =>
-    index === laneIndex ? { ...l, stock: afterFall, pending: remainingPending } : l
+    index === laneIndex ? { ...l, stock: restocked.stock, pending: remainingPending } : l
   );
 
-  return { state: { ...state, lanes }, pushedCount, fallenCards };
+  return {
+    state: { ...state, lanes, drawPile: [...state.drawPile, ...restocked.returned] },
+    pushedCount,
+    fallenCards,
+  };
 }
 
 /**
@@ -105,10 +114,13 @@ export function resolvePush(
 export function collectFallenCards(state: GameState, cards: readonly Card[]): GameState {
   const coins = cards.filter(isCoinCard);
   const events = cards.filter(isEventCard);
+  // ボール札は場から消えない。resolvePush が同じ枚数を奥へ入れ直しているので、
+  // ここでは点にするだけで、山札にも捨て札にも戻さない（§4-3）
+  const ballPoints = cards.filter(isBallCard).length * state.config.ballPoints;
 
   const players = updateCurrentPlayer(state, (p) => ({
     ...p,
-    pendingPoints: p.pendingPoints + totalPoints(coins),
+    pendingPoints: p.pendingPoints + totalPoints(coins) + ballPoints,
   }));
 
   return {

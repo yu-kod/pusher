@@ -11,7 +11,8 @@
  * （docs/spec.md のルール解釈メモ「イベントは連鎖する」）。
  * 連鎖はレーンの中身を1枚ずつ消費するので必ず終わる。
  */
-import { isEventCard, type Card, type EventKind } from "./deck.js";
+import { restockBalls } from "./ball.js";
+import { isEventCard, type Card, type DeckCard, type EventKind } from "./deck.js";
 import { resolveAvalanche, resolveExtraSlot, resolveLottery, resolveOpenLane } from "./events.js";
 import { collectFallenCards } from "./push.js";
 import type { Rng } from "./rng.js";
@@ -47,11 +48,21 @@ function dropOneMore(state: GameState, laneIndex: number): { state: GameState; f
   const fallen = state.lanes.flatMap((lane, index) =>
     index === laneIndex ? lane.stock.slice(0, 1) : []
   );
-  const lanes = state.lanes.map((lane, index) =>
-    index === laneIndex ? { ...lane, stock: lane.stock.slice(1) } : lane
-  );
+  // 落ちたのがボール札なら入れ直す（`docs/turn-structure.md` §4-3）
+  const returned: DeckCard[] = [];
+  const lanes = state.lanes.map((lane, index) => {
+    if (index !== laneIndex) {
+      return lane;
+    }
+    const restocked = restockBalls(lane.stock.slice(1), fallen);
+    returned.push(...restocked.returned);
+    return { ...lane, stock: restocked.stock };
+  });
 
-  return { state: { ...state, lanes }, fallen };
+  return {
+    state: { ...state, lanes, drawPile: [...state.drawPile, ...returned] },
+    fallen,
+  };
 }
 
 /** イベントの効果そのものを適用する（§6）。「もう1枚落とす」はここでは行わない */

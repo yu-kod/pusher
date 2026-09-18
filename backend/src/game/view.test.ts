@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { coin, faceDown, faceUp } from "../test-utils/cards.js";
-import { DEFAULT_BALANCE } from "./balance.js";
+import { DEFAULT_BALANCE, withPreset } from "./balance.js";
 import { createRng } from "./rng.js";
 import { setupGame, type GameState } from "./setup.js";
 import { splitOverrides, withPendingPoints, type StateOverrides } from "../test-utils/state.js";
@@ -236,5 +236,32 @@ describe("viewFor（クライアントへ返す状態・docs/spec.md §8）", ()
       expect(() => JSON.stringify(view)).not.toThrow();
       expect(JSON.parse(JSON.stringify(view))).toEqual(view);
     });
+  });
+});
+
+describe("ボール札の位置（docs/turn-structure.md §4-3）", () => {
+  it("奥の山で唯一の公開情報として出す", () => {
+    const state = setupGame(["A", "B", "C"], createRng(1), withPreset("ballCards"));
+
+    const view = viewFor(state, "p1");
+
+    // いちばん奥に置かれるので、レーンの厚みぶん押し込まないと落ちない
+    expect(view.lanes[0]?.ballIndex).toBe(DEFAULT_BALANCE.initialLaneCards);
+  });
+
+  it("ボール札を使わない設定では null", () => {
+    const state = setupGame(["A", "B", "C"], createRng(1), DEFAULT_BALANCE);
+
+    expect(viewFor(state, "p1").lanes.every((lane) => lane.ballIndex === null)).toBe(true);
+  });
+
+  it("中身までは見せない（枚数とボール札の位置だけ）", () => {
+    const state = setupGame(["A", "B", "C"], createRng(1), withPreset("ballCards"));
+
+    const lane = viewFor(state, "p1").lanes[0];
+
+    expect(Object.keys(lane ?? {}).sort()).toEqual(
+      ["ballIndex", "hasExtraSlot", "pending", "stockCount"].sort()
+    );
   });
 });

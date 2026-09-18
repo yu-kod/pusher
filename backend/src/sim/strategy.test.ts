@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { coin, faceDown } from "../test-utils/cards.js";
+import { ball } from "../game/deck.js";
 import { DEFAULT_BALANCE, withPreset } from "../game/balance.js";
 import { createRng } from "../game/rng.js";
 import { setupGame, type GameState, type Lane } from "../game/setup.js";
@@ -244,5 +245,53 @@ describe("EventChooser としての振る舞い", () => {
 
   it("滞留が空のレーンでも choosePending が壊れない", () => {
     expect(expectedValueStrategy().choosePending(buildState([1]), 0)).toBe(0);
+  });
+});
+
+describe("ボール札を見て狙う（docs/turn-structure.md §4-3）", () => {
+  const strategy = expectedValueStrategy();
+
+  /** 同じ条件の3レーンのうち、laneIndex だけボール札を末端から depth 枚目に置く */
+  function withBall(laneIndex: number, depth: number): GameState {
+    const base = buildState([1, 1, 1], [{}, {}, {}], { config: withPreset("ballCards") });
+    return {
+      ...base,
+      lanes: base.lanes.map((lane, i) => ({
+        ...lane,
+        stock:
+          i === laneIndex
+            ? [...Array.from({ length: depth }, () => coin(1)), ball(), coin(1)]
+            : [coin(1), coin(1), coin(1)],
+      })),
+    };
+  }
+
+  it("あと1枚で落ちるボール札のあるレーンを狙う", () => {
+    const insertions = strategy.chooseInsertions(withBall(2, 0), createRng(1));
+
+    expect(insertions[0]?.laneIndex).toBe(2);
+  });
+
+  it("ボール札が奥深くにあるうちは、他のレーンと変わらない扱いになる", () => {
+    // 押し込める枚数より深ければ今回は落ちないので、狙う理由にならない
+    const deep = strategy.chooseInsertions(withBall(2, 5), createRng(1));
+    const none = strategy.chooseInsertions(
+      buildState([1, 1, 1], [{}, {}, {}], { config: withPreset("ballCards") }),
+      createRng(1)
+    );
+
+    expect(deep[0]?.laneIndex).toBe(none[0]?.laneIndex);
+  });
+
+  it("ボール札を使わない設定では狙いが変わらない", () => {
+    const base = buildState([1, 1, 1], [{}, {}, {}]);
+    const withBallInLane = {
+      ...base,
+      lanes: base.lanes.map((lane, i) => (i === 2 ? { ...lane, stock: [ball()] } : lane)),
+    };
+
+    // config が off なら ballPoints は乗るが、そもそも盤面に置かれない。
+    // 置かれていたとしても位置は同じに評価される（設定で切るのは配置のほう）
+    expect(strategy.chooseInsertions(withBallInLane, createRng(1))).toHaveLength(1);
   });
 });

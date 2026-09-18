@@ -4,7 +4,7 @@
  * 状態は不変に扱う。各関数は引数の状態を変更せず、新しい状態を返す。
  */
 import { type Balance } from "./balance.js";
-import { createDeck, isCoinCard, type Card } from "./deck.js";
+import { ball, createDeck, isCoinCard, type Card, type DeckCard } from "./deck.js";
 import type { Rng } from "./rng.js";
 
 export type PlayerId = string;
@@ -17,7 +17,7 @@ export type Player = {
    *
    * v0.2 で手札は**弾薬のみ**になった。得点にはならない（docs/spec.md §1）。
    */
-  hand: Card[];
+  hand: DeckCard[];
   /** 確定した得点。手番を終えるたびに未確定得点がここへ加算される（§3） */
   points: number;
   /**
@@ -45,7 +45,12 @@ export type PendingCard = {
 };
 
 export type Lane = {
-  /** 奥の山。裏向きで、中身は誰にも分からない */
+  /**
+   * 奥の山。裏向きで、中身は誰にも分からない。
+   *
+   * 例外はボール札で、列の中で**1枚だけ表向き**に置かれる。だから中身は伏せたまま
+   * 「あと何枚押し込めば落ちるか」だけが公開情報になる（`docs/turn-structure.md` §4-3）。
+   */
   stock: Card[];
   /** 滞留エリア。添字 0 が奥側（レーンに近い側）で、先に入ったカードから押し込まれる */
   pending: PendingCard[];
@@ -60,9 +65,9 @@ export type GameState = {
   lanes: Lane[];
   players: Player[];
   /** 山札。落下したコインカードは底へ戻る（docs/spec.md のルール解釈メモ） */
-  drawPile: Card[];
+  drawPile: DeckCard[];
   /** 捨て札。解決済みのイベントカードが入る。山札へは戻らない（§6） */
-  discardPile: Card[];
+  discardPile: DeckCard[];
   /**
    * この手番でこれまでに行った投入ラウンドの回数（§3）。
    *
@@ -130,16 +135,16 @@ export function setupGame(playerNames: readonly string[], rng: Rng, config: Bala
 
   // シャッフル済みデッキの先頭から順に配っていく
   let next = 0;
-  const take = (count: number): Card[] => deck.slice(next, (next += count));
+  const take = (count: number): DeckCard[] => deck.slice(next, (next += count));
 
   /**
    * 手札用にコインカードだけを配る。イベントカードは飛ばす（引き直す）。
    *
    * 飛ばしたカードは配布済みの位置に置き去りにせず、あとで山札へ戻す。
    */
-  const skipped: Card[] = [];
-  const takeCoins = (count: number): Card[] => {
-    const taken: Card[] = [];
+  const skipped: DeckCard[] = [];
+  const takeCoins = (count: number): DeckCard[] => {
+    const taken: DeckCard[] = [];
     while (taken.length < count) {
       const [card] = take(1);
       if (card === undefined) {
@@ -155,7 +160,9 @@ export function setupGame(playerNames: readonly string[], rng: Rng, config: Bala
   };
 
   const lanes: Lane[] = Array.from({ length: config.laneCount }, () => ({
-    stock: take(config.initialLaneCards),
+    // ボール札はいちばん奥（末尾）に置く。レーンの厚みぶん押し込まないと落ちない
+    // ので、位置がそのまま「あと何枚か」になる（docs/turn-structure.md §4-3）
+    stock: [...take(config.initialLaneCards), ...(config.useBallCards ? [ball()] : [])],
     // 滞留も裏向きで始める。空から始めると先手が一方的に不利になる（§2 / #54）
     pending: take(config.initialPendingCards).map((card) => ({ card, faceUp: false })),
     hasExtraSlot: false,

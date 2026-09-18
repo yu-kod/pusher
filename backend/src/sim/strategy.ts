@@ -17,6 +17,7 @@ import { isCoinCard, type CoinCard } from "../game/deck.js";
 import { pendingPointsOf } from "../game/push.js";
 import type { EventChooser } from "../game/resolve.js";
 import type { Rng } from "../game/rng.js";
+import { ballIndexOf } from "../game/ball.js";
 import type { GameState, Lane } from "../game/setup.js";
 import type { LaneInsertion } from "../game/turn.js";
 
@@ -80,7 +81,17 @@ function evaluate(
   // 押し込めるのは滞留にあるぶんだけ。投入した1枚も滞留に入る
   const pushed = Math.min(state.config.pushCount(card.coins), lane.pending.length + 1);
 
-  return { laneIndex, handIndex, gain: successRate * pushed * ESTIMATED_POINTS_PER_CARD, risky };
+  // ボール札は末端から数えて pushed 枚目までに居れば今回落ちる
+  // （`docs/turn-structure.md` §4-3）。位置が見えているからこそ狙える
+  const ballIndex = ballIndexOf(lane);
+  const ballGain = ballIndex !== null && ballIndex < pushed ? state.config.ballPoints : 0;
+
+  return {
+    laneIndex,
+    handIndex,
+    gain: successRate * (pushed * ESTIMATED_POINTS_PER_CARD + ballGain),
+    risky,
+  };
 }
 
 /**

@@ -112,6 +112,22 @@ export type Balance = {
   useResolutionPriority: boolean;
 
   /**
+   * ボール札をレーンに置くか（`docs/turn-structure.md` §4-3）。
+   *
+   * 各レーンの奥にいちばん深い位置で1枚ずつ入る。列の中で1枚だけ表向きなので、
+   * **あと何枚押し込めば落ちるかが全員に見える。** これが「同じレーンを狙う理由」になる。
+   */
+  useBallCards: boolean;
+
+  /**
+   * ボール札が落ちたときの点数（§4-3）。
+   *
+   * 1手番の取り分 6.25点の約1.6倍として 10点を初期値にする。未確定得点に入るので、
+   * 横穴を踏めば失う。
+   */
+  ballPoints: number;
+
+  /**
    * 1回の投入ラウンドで投入できるレーンの数（§3）。
    *
    * 既定は 1。#39 は「投入するレーン数をリスクの調整ダイヤルにする」設計だったが、
@@ -254,6 +270,8 @@ export const DEFAULT_BALANCE: Balance = {
 
   progressMode: "turn",
   useResolutionPriority: false,
+  useBallCards: false,
+  ballPoints: 10,
   maxLanesPerRound: 1,
   maxInsertionRoundsPerTurn: null,
   roundDrawCount: 3,
@@ -322,6 +340,22 @@ export const BALANCE_PRESETS = {
     progressMode: "tick" as const,
     useResolutionPriority: true,
     rotateStartPlayer: false,
+  },
+
+  /** ボール札だけを足す（進行方式は変えない）。押し出しの側だけを見たいとき用 */
+  ballCards: { useBallCards: true },
+
+  /**
+   * §9 段階3: 同時進行 ＋ 先行権 ＋ ボール札。**本命案の全体像**（§3）。
+   *
+   * 3つはセットで効く。同時進行が「取り合いが起きる状況」を作り、ボール札が
+   * 「取り合う対象」を置き、先行権が「取り合いの勝敗を判断で決める」。
+   */
+  tickBall: {
+    progressMode: "tick" as const,
+    useResolutionPriority: true,
+    rotateStartPlayer: false,
+    useBallCards: true,
   },
 
   /** #68 以前の既定: 全員に同じ枚数を配る（先手の勝率が 0.28 まで上がる） */

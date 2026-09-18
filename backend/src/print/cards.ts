@@ -30,10 +30,9 @@ export const LANE_NAMES = ["左", "中央", "右"] as const;
 /**
  * ボール札の得点（docs/turn-structure.md §4-3）。
  *
- * 1手番の取り分 6.25点の約1.6倍として 10点が初期値。まだエンジンに入っていない
- * （ボール札は #88 以降で実装される）ため、確定したら `game/balance.ts` へ移す。
+ * エンジンの調整値が出典（#100）。印刷物とエンジンで別の数字を持たない。
  */
-export const BALL_CARD_POINTS = 10;
+export const BALL_CARD_POINTS = DEFAULT_BALANCE.ballPoints;
 
 export type PrintCard =
   | { kind: "coin"; coins: CoinCount }

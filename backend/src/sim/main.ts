@@ -85,6 +85,10 @@ function format(summary: Summary): string {
     "ティック同時進行（docs/turn-structure.md §4-1・手番制では 0）",
     `  1ゲームのティック数 ${round(summary.avgTicksPerGame)}  (待ち時間の指標)`,
     `  レーンの取り合い率  ${round(summary.sameLaneRate)}  (0 なら並んでソロプレイ)`,
+    "",
+    "ボール札（docs/turn-structure.md §4-3・使わない設定では 0）",
+    `  1ゲームの落下回数   ${round(summary.avgBallDrops)}  (少なすぎると狙う機会が無い)`,
+    `  終了時のレーンの厚み ${round(summary.avgFinalLaneStock)}  (落ちるたび1枚増える。膨らみすぎないか)`,
   ].join("\n");
 }
 
