@@ -13,6 +13,14 @@ export type PendingCardView = { faceUp: true; card: Card } | { faceUp: false };
 
 export type LaneView = {
   stockCount: number;
+  /**
+   * ボール札が末端（落下口の側）から何枚目にあるか。無ければ null。
+   *
+   * 奥の山で**唯一の公開情報**（docs/turn-structure.md §4-3）。卓上では列の中で
+   * 1枚だけ表向きに置かれ、あと何枚押し込めば落ちるかが全員に見える。
+   * これが見えないと、同じレーンを狙い合う理由そのものが消える。
+   */
+  ballIndex: number | null;
   pending: PendingCardView[];
   hasExtraSlot: boolean;
 };

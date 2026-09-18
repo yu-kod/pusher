@@ -5,12 +5,16 @@ import { cardLabel } from "@/lib/cards";
 import { laneName } from "@/lib/rules";
 import { PAYOUT_DRIFT, tossFrom } from "../cardFlight";
 
-/** 奥の山として描く最大枚数。実際の枚数は数字で添える */
-const MAX_STOCK_CARDS = 4;
+/**
+ * 奥の山で1枚ずらす量（px）。
+ *
+ * ボール札が何枚目にあるかを**数えられる**だけの間隔を取る。厚みだけを見せていた
+ * ときより広いのは、奥の山がただの厚みではなく、位置の読める列になったため
+ * （docs/turn-structure.md §4-3）。
+ */
+const STOCK_OFFSET = 9;
 /** 滞留エリアで重ねたカードをずらす量（px） */
 const STACK_OFFSET = 9;
-/** 奥の山で重ねたカードをずらす量（px）。厚みだけ見せたいので小さく */
-const STOCK_OFFSET = 3;
 /** 小サイズのカードの高さ（px）。PlayingCard の size="sm" に合わせる */
 const SMALL_CARD_HEIGHT = 56;
 
@@ -50,7 +54,13 @@ export function Lane({
 }: Props) {
   const name = laneName(index);
   const toss = tossFrom(index, laneCount);
-  const stockCards = Math.min(lane.stockCount, MAX_STOCK_CARDS);
+  // 奥の山は末端（落下口の側）が添字 0。画面では下が末端なので、描く順は逆になる。
+  // 手前から順に重ねるので、ボール札より末端側のカードはボール札の上に乗り、
+  // 卓上と同じく「ボール札の下にあと何枚あるか」を数えられる
+  const ball =
+    lane.ballIndex === null
+      ? null
+      : { drawnAt: lane.stockCount - 1 - lane.ballIndex, fromEnd: lane.ballIndex };
   const pendingHeight = SMALL_CARD_HEIGHT + Math.max(lane.pending.length - 1, 0) * STACK_OFFSET;
 
   return (
@@ -68,21 +78,32 @@ export function Lane({
     >
       <span className="text-[11px] font-bold tracking-wider text-emerald-50/80">{name}</span>
 
-      {/* 奥の山（裏向き）。枚数が多いほど厚く見える */}
+      {/* 奥の山。中身は裏向きだが、ボール札だけは位置が見える（§4-3） */}
       <span
         className="relative w-[40px]"
-        style={{ height: SMALL_CARD_HEIGHT + (stockCards - 1) * STOCK_OFFSET }}
-        aria-hidden="true"
+        style={{ height: SMALL_CARD_HEIGHT + Math.max(lane.stockCount - 1, 0) * STOCK_OFFSET }}
       >
-        {Array.from({ length: stockCards }, (_, i) => (
-          <PlayingCard
-            key={i}
-            faceUp={false}
-            size="sm"
-            className="absolute left-0"
-            style={{ top: i * STOCK_OFFSET }}
-          />
-        ))}
+        {Array.from({ length: lane.stockCount }, (_, i) =>
+          ball !== null && i === ball.drawnAt ? (
+            <span
+              key={i}
+              data-testid="ball-card"
+              aria-label={`ボール札 落下口から${ball.fromEnd + 1}枚目`}
+              className="ball-card absolute left-0 flex w-[40px] items-start justify-center rounded-[4px] border border-amber-900/50 pt-1 text-[9px] font-bold text-amber-950"
+              style={{ top: i * STOCK_OFFSET, height: SMALL_CARD_HEIGHT }}
+            >
+              ボール
+            </span>
+          ) : (
+            <PlayingCard
+              key={i}
+              faceUp={false}
+              size="sm"
+              className="absolute left-0"
+              style={{ top: i * STOCK_OFFSET }}
+            />
+          )
+        )}
       </span>
       <span className="text-[10px] text-emerald-50/50">奥 {lane.stockCount}枚</span>
 

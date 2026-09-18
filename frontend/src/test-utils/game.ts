@@ -4,7 +4,7 @@ export const coin = (coins: 1 | 2 | 3): Card => ({ kind: "coin", coins });
 export const eventCard = (event: string): Card => ({ kind: "event", event });
 
 export function buildLane(overrides: Partial<LaneView> = {}): LaneView {
-  return { stockCount: 5, pending: [], hasExtraSlot: false, ...overrides };
+  return { stockCount: 6, ballIndex: 5, pending: [], hasExtraSlot: false, ...overrides };
 }
 
 export function buildPlayer(overrides: Partial<PlayerView> = {}): PlayerView {

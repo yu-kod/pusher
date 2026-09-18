@@ -21,6 +21,18 @@
     repeating-linear-gradient(-45deg, rgba(0, 0, 0, 0.18) 0 2px, transparent 2px 5px);
 }
 
+/*
+ * ボール札。列の中でこれだけが表向きで、位置が全員に見える
+ * （docs/turn-structure.md §4-3）。裏向きの山に紛れないよう、面で目立たせる
+ */
+.ball-card {
+  background-color: #fbbf24;
+  background-image: radial-gradient(circle at 50% 62%, #fde68a 0 34%, #f59e0b 35% 100%);
+  box-shadow:
+    0 1px 3px rgba(0, 0, 0, 0.45),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.35);
+}
+
 /* レーンのトレイ。木枠に落とし込まれている感じ */
 .lane-tray {
   background-color: rgba(0, 0, 0, 0.28);
