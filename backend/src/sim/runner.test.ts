@@ -223,3 +223,91 @@ describe("判断が発生しているかの指標（docs/spec.md §7 / #56）", 
     expect(summary.avgStopPoints).toBe(0);
   });
 });
+
+describe("ティック同時進行（docs/turn-structure.md §4-1）", () => {
+  const tick = withPreset("tickMode");
+
+  it("同時進行でも完走する", () => {
+    const stats = simulateGame(tick, expectedValueStrategy(), createRng(1), PLAYERS);
+
+    expect(stats.finished).toBe(true);
+    expect(stats.rounds).toBeLessThanOrEqual(tick.maxRounds);
+  });
+
+  it("3人でも回る", () => {
+    expect(simulateGame(tick, randomStrategy(), createRng(5), 3).finished).toBe(true);
+  });
+
+  it("ティック数を数える。手番制では 0 のまま", () => {
+    const simultaneous = simulateGame(tick, expectedValueStrategy(), createRng(2), PLAYERS);
+    const sequential = simulateGame(
+      DEFAULT_BALANCE,
+      expectedValueStrategy(),
+      createRng(2),
+      PLAYERS
+    );
+
+    expect(simultaneous.ticks).toBeGreaterThan(0);
+    expect(sequential.ticks).toBe(0);
+    expect(sequential.sameLaneTicks).toBe(0);
+  });
+
+  it("1ティックで複数人が解決するので、ティック数は投入ラウンド数より少ない", () => {
+    const stats = simulateGame(tick, expectedValueStrategy(), createRng(3), PLAYERS);
+
+    expect(stats.ticks).toBeLessThan(stats.insertionRounds);
+  });
+
+  it("同じレーンの取り合いが起きる（§4-5）", () => {
+    const stats = simulateGame(tick, expectedValueStrategy(), createRng(3), PLAYERS);
+
+    expect(stats.sameLaneTicks).toBeGreaterThan(0);
+    expect(stats.sameLaneTicks).toBeLessThanOrEqual(stats.ticks);
+  });
+
+  it("全員がラウンドごとにちょうど1回だけ降りる", () => {
+    const stats = simulateGame(tick, expectedValueStrategy(), createRng(4), PLAYERS);
+
+    expect(stats.voluntaryStops + stats.forcedStops).toBe(stats.turns);
+    expect(stats.turns).toBe(stats.rounds * PLAYERS);
+  });
+
+  it("手札が尽きて誰も投入できないラウンドがあっても完走する", () => {
+    const stats = simulateGame(
+      withPreset("tickMode", "noRoundDraw"),
+      expectedValueStrategy(),
+      createRng(1),
+      PLAYERS
+    );
+
+    expect(stats.finished).toBe(true);
+  });
+
+  it("未確定得点はプレイヤーごとなので、得点が入るのは降りた人だけ（#88）", () => {
+    const stats = simulateGame(tick, expectedValueStrategy(), createRng(6), PLAYERS);
+
+    expect(stats.finalPoints).toHaveLength(PLAYERS);
+    expect(stats.finalPoints.some((p) => p > 0)).toBe(true);
+  });
+
+  it("同じシードなら同じ結果になる（再現性）", () => {
+    const run = () => simulateGame(tick, expectedValueStrategy(), createRng(42), PLAYERS);
+
+    expect(run()).toEqual(run());
+  });
+
+  it("1ゲームあたりのティック数と取り合いの割合を集計する", () => {
+    const summary = simulateMany(5, tick, expectedValueStrategy(), createRng(1), PLAYERS);
+
+    expect(summary.avgTicksPerGame).toBeGreaterThan(0);
+    expect(summary.sameLaneRate).toBeGreaterThan(0);
+    expect(summary.sameLaneRate).toBeLessThanOrEqual(1);
+  });
+
+  it("ゲームが 0 件でも壊れない", () => {
+    const summary = summarize([]);
+
+    expect(summary.avgTicksPerGame).toBe(0);
+    expect(summary.sameLaneRate).toBe(0);
+  });
+});
