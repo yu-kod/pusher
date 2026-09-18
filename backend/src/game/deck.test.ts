@@ -96,10 +96,15 @@ describe("DEFAULT_DECK_CONFIG", () => {
     expect(ratio(3)).toBeCloseTo(0.15, 1);
   });
 
-  it("場に出る枚数の2倍以上ある（docs/spec.md §1）", () => {
-    // レーン 3×5 + 滞留 3×5 + 手札 4×5 = 50 枚が場に出る。
-    // 落下カードは山札へ戻る閉じた循環なので、その2倍あれば山札は枯れない
-    expect(deck.length).toBeGreaterThanOrEqual(44 * 2);
+  it("4人に配りきってもまだ山札が残る（docs/spec.md §1）", () => {
+    // v0.3 で場に出るのは レーン 3×12 + 滞留 3×9 + 手札 (5+6+7+8) = 89 枚
+    // （ボール札はデッキに入らない）。v0.2 の「場に出る枚数の2倍を持つ」余裕は、
+    // レーンを深くしたぶん無くなった（104 ÷ 89 = 1.17倍）。落下カードは山札へ戻り、
+    // 尽きたら捨て札を混ぜ直す（§3）ので、要るのは「配りきれること」だけ
+    const onTable = 3 * 12 + 3 * 9 + (5 + 6 + 7 + 8);
+
+    expect(onTable).toBe(89);
+    expect(deck.length).toBeGreaterThan(onTable);
   });
 });
 

@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { createDeck, isCoinCard, isEventCard } from "./deck.js";
+import { createRng } from "./rng.js";
+import { setupGame } from "./setup.js";
 import {
   BALANCE_PRESETS,
   DEFAULT_BALANCE,
@@ -48,6 +50,38 @@ describe("DEFAULT_BALANCE", () => {
   });
 });
 
+describe("レーンを4本にする比較（docs/spec.md §7 次点）", () => {
+  const NAMES_4 = ["A", "B", "C", "D"];
+
+  it("既定の人数（4人）でそのまま回せる。どのシードでも配りきれる", () => {
+    for (let seed = 1; seed <= 30; seed++) {
+      const state = setupGame(NAMES_4, createRng(seed), withPreset("lanes4"));
+
+      expect(state.lanes).toHaveLength(4);
+    }
+  });
+
+  it("変わるのはレーンの本数だけ。深さも構成比も既定と同じに保つ", () => {
+    const balance = withPreset("lanes4");
+    const coins = createDeck(balance.deck).filter(isCoinCard);
+    const ratio = (n: 1 | 2 | 3) => coins.filter((c) => c.coins === n).length / coins.length;
+
+    expect(balance.initialLaneCards).toBe(DEFAULT_BALANCE.initialLaneCards);
+    expect(balance.initialPendingCards).toBe(DEFAULT_BALANCE.initialPendingCards);
+    expect(ratio(1)).toBeCloseTo(0.46, 1);
+    expect(ratio(2)).toBeCloseTo(0.39, 1);
+    expect(ratio(3)).toBeCloseTo(0.15, 1);
+  });
+
+  it("デッキを増やさずにレーンだけ増やすことはできない", () => {
+    // 4 × (奥12 + 滞留9) + 手札26 = 110枚 > 104枚。
+    // 「レーンを深くする」と「レーンを増やす」は同じカードを取り合う
+    const deepFour = { ...DEFAULT_BALANCE, laneCount: 4 };
+
+    expect(() => setupGame(NAMES_4, createRng(1), deepFour)).toThrow(/デッキが足りない/);
+  });
+});
+
 describe("withPreset", () => {
   it("プリセットを適用した Balance を返す", () => {
     expect(withPreset("lanes4").laneCount).toBe(4);
@@ -61,10 +95,11 @@ describe("withPreset", () => {
   });
 
   it("指定しなかった値は既定のまま残る", () => {
-    const balance = withPreset("lanes4");
+    const balance = withPreset("noRoundDraw");
 
     expect(balance.maxRounds).toBe(DEFAULT_BALANCE.maxRounds);
     expect(balance.deck).toEqual(DEFAULT_BALANCE.deck);
+    expect(balance.laneCount).toBe(DEFAULT_BALANCE.laneCount);
   });
 
   it("複数のプリセットを重ねられる", () => {
